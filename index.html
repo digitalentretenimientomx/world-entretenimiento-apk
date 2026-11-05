@@ -1,0 +1,2373 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-900 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Entretenimiento - Panel de Administración Cloud</title>
+
+  <!-- Configuración PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#06b6d4">
+
+  <!-- Tailwind CSS & FontAwesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <script>
+    if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => console.error('Error SW:', err));
+      });
+    }
+  </script>
+</head>
+<body class="h-full bg-slate-900 text-slate-100 font-sans antialiased selection:bg-cyan-500 selection:text-white">
+
+  <div id="app" class="min-h-screen flex flex-col md:flex-row">
+    <!-- Sidebar / Menú Lateral -->
+    <aside id="sidebar" class="w-full md:w-64 bg-slate-950 border-r border-slate-800 flex flex-col justify-between transition-all duration-300 z-30 hidden">
+      <div>
+        <div class="p-4 flex items-center justify-between border-b border-slate-800">
+          <div class="flex items-center gap-3">
+            <img id="sidebarLogoImg" src="" alt="World Entretenimiento" class="w-10 h-10 rounded-xl object-cover border border-cyan-500/40 shadow-md shadow-cyan-500/20 flex-shrink-0">
+            <div>
+              <h1 class="font-bold text-sm tracking-wide text-white leading-tight">World Entretenimiento</h1>
+              <span id="currentRoleBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-medium">Invitado</span>
+            </div>
+          </div>
+        </div>
+
+        <nav class="p-3 space-y-1" id="mainNav"></nav>
+      </div>
+
+      <div class="p-3 border-t border-slate-800 space-y-2">
+        <div class="pt-2 border-t border-slate-800 flex items-center justify-between px-2">
+          <div class="flex items-center gap-2">
+            <div id="userAvatar" class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs text-white">--</div>
+            <div class="text-xs">
+              <p id="userNameLabel" class="font-medium text-white">Sin Sesión</p>
+              <p id="userRoleLabel" class="text-slate-400 text-[10px]">Por favor ingresa</p>
+            </div>
+          </div>
+          <button onclick="logout()" title="Cerrar Sesión" class="text-slate-400 hover:text-red-400 text-sm p-1.5 transition-colors">
+            <i class="fa-solid fa-power-off"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Área Principal -->
+    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto bg-slate-900">
+      <header id="mainHeader" class="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-20 px-4 py-3 flex items-center justify-between hidden">
+        <div class="flex items-center gap-3">
+          <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-white p-2">
+            <i class="fa-solid fa-bars text-xl"></i>
+          </button>
+          <h2 id="pageTitle" class="text-lg font-semibold text-white">Dashboard Resumen</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <!-- CAMPANA DE NOTIFICACIONES -->
+          <div class="relative">
+            <button onclick="toggleNotificationsDropdown()" class="relative bg-slate-800 hover:bg-slate-700 text-slate-300 p-2 rounded-lg border border-slate-700 transition">
+              <i class="fa-solid fa-bell text-cyan-400"></i>
+              <span id="notifBadge" class="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full hidden">0</span>
+            </button>
+            
+            <!-- Panel Flotante de Notificaciones -->
+            <div id="notifDropdown" class="absolute right-0 mt-2 w-80 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 hidden overflow-hidden">
+              <div class="p-3 bg-slate-900/90 border-b border-slate-700 flex items-center justify-between">
+                <h4 class="font-bold text-xs text-white uppercase tracking-wider flex items-center gap-2">
+                  <i class="fa-solid fa-bell text-cyan-400"></i> Notificaciones del Sistema
+                </h4>
+                <button onclick="markAllNotificationsAsRead()" class="text-[10px] text-cyan-400 hover:underline">Marcar leídas</button>
+              </div>
+              <div id="notifListContainer" class="max-h-72 overflow-y-auto divide-y divide-slate-700/50">
+                <!-- Se llena dinámicamente -->
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 text-xs bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-lg border border-emerald-500/20">
+            <i class="fa-solid fa-cloud animate-pulse"></i>
+            <span class="hidden sm:inline">Firebase Cloud</span>
+          </div>
+
+          <button onclick="exportAllJSON()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-slate-700 transition">
+            <i class="fa-solid fa-download text-cyan-400"></i>
+            <span class="hidden sm:inline">Respaldo JSON</span>
+          </button>
+          <button onclick="logout()" class="text-xs bg-red-600/20 hover:bg-red-600/30 text-red-400 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-red-500/30 transition">
+            <i class="fa-solid fa-power-off"></i>
+            <span>Cerrar Sesión</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="p-4 md:p-6 space-y-6">
+
+        <!-- 1. LOGIN -->
+        <section id="loginView" class="view-section">
+          <div class="max-w-md mx-auto my-12 bg-slate-800/80 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-6">
+            <div class="text-center space-y-3">
+              <img id="loginLogoImg" src="" alt="World Entretenimiento Logo" class="w-24 h-24 rounded-2xl mx-auto object-cover border-2 border-cyan-500/40 shadow-xl shadow-cyan-500/20">
+              <div>
+                <h3 class="text-xl font-bold text-white">World Entretenimiento</h3>
+                <p class="text-xs text-slate-400 mt-1">Acceso al Panel Cloud</p>
+              </div>
+            </div>
+
+            <div id="loginAlert" class="hidden p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-xs text-center font-medium"></div>
+
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Correo Electrónico</label>
+                <input type="email" id="loginEmail" placeholder="admin@stream.com" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Contraseña</label>
+                <input type="password" id="loginPass" placeholder="••••••••" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+              </div>
+              <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2.5 rounded-lg text-sm transition shadow-lg shadow-cyan-600/20">Iniciar Sesión</button>
+            </form>
+          </div>
+        </section>
+
+        <!-- 2. DASHBOARD -->
+        <section id="dashboardView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-medium text-slate-400">Usuarios / Clientes</p>
+                <h3 id="statTotalUsers" class="text-2xl font-bold text-white mt-1">0</h3>
+              </div>
+              <div class="w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 text-xl"><i class="fa-solid fa-users"></i></div>
+            </div>
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-medium text-slate-400">Plataformas Activas</p>
+                <h3 id="statTotalPlatforms" class="text-2xl font-bold text-white mt-1">0</h3>
+              </div>
+              <div class="w-12 h-12 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 text-xl"><i class="fa-solid fa-tv"></i></div>
+            </div>
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-medium text-slate-400">Ventas Totales</p>
+                <h3 id="statTotalSales" class="text-2xl font-bold text-white mt-1">0</h3>
+              </div>
+              <div class="w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl"><i class="fa-solid fa-cart-shopping"></i></div>
+            </div>
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-medium text-slate-400">Reportes de Soporte</p>
+                <h3 id="statPendingSupport" class="text-2xl font-bold text-red-400 mt-1">0</h3>
+              </div>
+              <div class="w-12 h-12 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 text-xl"><i class="fa-solid fa-headset"></i></div>
+            </div>
+          </div>
+
+          <div class="bg-slate-800/50 border border-slate-700/60 rounded-xl p-5">
+            <h3 class="text-base font-semibold text-white mb-4 flex items-center gap-2">
+              <i class="fa-solid fa-list-check text-cyan-400"></i> Últimas Suscripciones Asignadas
+            </h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm text-left text-slate-300">
+                <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                  <tr>
+                    <th class="px-4 py-3">Cliente</th>
+                    <th class="px-4 py-3">Plataforma</th>
+                    <th class="px-4 py-3">Tipo</th>
+                    <th class="px-4 py-3">Vencimiento</th>
+                    <th class="px-4 py-3">Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="dashSalesTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. USUARIOS -->
+        <section id="usersView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 id="userFormTitle" class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-user-plus text-cyan-400"></i> Registrar Usuario / Cliente
+              </h3>
+              <form id="userForm" onsubmit="handleUserSubmit(event)" class="space-y-4">
+                <input type="hidden" id="userId">
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Nombre Completo</label>
+                  <input type="text" id="userName" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Correo Electrónico (Debe tener dominio autorizado)</label>
+                  <input type="email" id="userEmail" required placeholder="correo@dominioautorizado.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">WhatsApp / Teléfono</label>
+                  <input type="tel" id="userPhone" placeholder="Ej: 525512345678" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Contraseña</label>
+                  <input type="text" id="userPassword" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Rol</label>
+                    <select id="userRole" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                      <option value="cliente">Cliente Final</option>
+                      <option value="vendedor" id="optRoleVendedor">Vendedor / Revendedor</option>
+                      <option value="admin" id="optRoleAdmin">World Entretenimiento Super Admin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Estado</label>
+                    <select id="userStatus" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                      <option value="activo">Activo</option>
+                      <option value="inactivo">Inactivo</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="pt-2 flex gap-2">
+                  <button type="submit" id="btnSaveUser" class="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 rounded-lg text-sm transition">Guardar Usuario</button>
+                  <button type="button" onclick="resetUserForm()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-2 rounded-lg text-sm transition">Cancelar</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <div class="flex items-center justify-between">
+                <h3 class="text-base font-semibold text-white">Directorio de Usuarios</h3>
+                <input type="text" id="searchUser" oninput="renderUsersTable()" placeholder="Buscar usuario..." class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white">
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-slate-300">
+                  <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                    <tr>
+                      <th class="px-4 py-3">Usuario</th>
+                      <th class="px-4 py-3">Contacto WA</th>
+                      <th class="px-4 py-3">Rol</th>
+                      <th class="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usersTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. DOMINIOS PERMITIDOS -->
+        <section id="domainsView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-globe text-cyan-400"></i> Registrar Dominio Permitido
+              </h3>
+              <form id="domainForm" onsubmit="handleDomainSubmit(event)" class="space-y-4">
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Nombre del Dominio (sin @)</label>
+                  <input type="text" id="domainName" required placeholder="Ej: stream.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Nota</label>
+                  <input type="text" id="domainNote" placeholder="Ej: Vendedores oficiales" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 rounded-lg text-sm transition">Autorizar Dominio</button>
+              </form>
+            </div>
+
+            <div class="lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white">Dominios Autorizados para Cuentas</h3>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-slate-300">
+                  <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                    <tr>
+                      <th class="px-4 py-3">Dominio</th>
+                      <th class="px-4 py-3">Nota</th>
+                      <th class="px-4 py-3 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="domainsTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. BOOTS / BOTS STREAMING -->
+        <section id="botsView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div id="botRegisterBox" class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-robot text-cyan-400"></i> Registro de Boot
+              </h3>
+              <form id="botForm" onsubmit="handleBotSubmit(event)" class="space-y-4">
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-2">Seleccionar Dominios Autorizados (Múltiples)</label>
+                  <div id="botDomainsCheckboxes" class="max-h-36 overflow-y-auto bg-slate-900 border border-slate-700 rounded-lg p-2.5 space-y-2"></div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Nombre del Boot</label>
+                  <input type="text" id="botName" required placeholder="Ej: Bot Renovaciones Netflix" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">URL del Boot</label>
+                  <input type="url" id="botUrl" required placeholder="https://mi-bot-automation.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 rounded-lg text-sm transition shadow-lg shadow-cyan-600/20">Registrar Boot</button>
+              </form>
+            </div>
+
+            <div id="botDisplayBox" class="lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6">
+              <div>
+                <h3 class="text-base font-semibold text-white mb-2 flex items-center gap-2">
+                  <i class="fa-solid fa-satellite-dish text-cyan-400"></i> Centro de Operación de Boots
+                </h3>
+                <p class="text-xs text-slate-400 mb-4">Selecciona tu dominio para filtrar y desplegar los bots habilitados.</p>
+                <div class="max-w-md">
+                  <label class="block text-xs font-medium text-cyan-400 mb-1">Filtrar por Dominio</label>
+                  <select id="filterVendorBotDomain" onchange="renderBotsDisplay()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"></select>
+                </div>
+              </div>
+
+              <div id="botsCardsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. PLATAFORMAS -->
+        <section id="platformsView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 id="platformFormTitle" class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-tv text-cyan-400"></i> <span id="platformFormHeaderTitle">Nueva Plataforma</span>
+              </h3>
+              <form id="platformForm" onsubmit="handlePlatformSubmit(event)" class="space-y-4">
+                <input type="hidden" id="platformId">
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Nombre Plataforma</label>
+                  <input type="text" id="platformName" required placeholder="Ej: NETFLIX" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Categoría</label>
+                  <input type="text" id="platformCategory" placeholder="Ej: Video" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Logotipo de la Plataforma</label>
+                  <div class="flex items-center gap-3 mb-2">
+                    <div id="platformLogoPreviewBox" class="w-12 h-12 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden">
+                      <i class="fa-solid fa-tv text-slate-500"></i>
+                    </div>
+                    <div class="flex-1 space-y-1">
+                      <input type="file" id="platformLogoFile" accept="image/*" onchange="handlePlatformLogoFile(event)" class="block w-full text-[10px] text-slate-400">
+                    </div>
+                  </div>
+                  <input type="text" id="platformLogoUrlInput" placeholder="O pega la URL de la imagen..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white">
+                </div>
+                <div class="pt-2 flex gap-2">
+                  <button type="submit" id="btnSavePlatform" class="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 rounded-lg text-sm transition">Guardar Plataforma</button>
+                  <button type="button" onclick="resetPlatformForm()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-2 rounded-lg text-sm transition">Cancelar</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="lg:col-span-2 space-y-4">
+              <h3 class="text-base font-semibold text-white">Catálogo Global de Plataformas</h3>
+              <div id="platformsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 7. VENTAS DIRECTAS & ASIGNACIÓN -->
+        <section id="salesView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 id="saleFormTitle" class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-cart-plus text-cyan-400"></i> <span id="saleFormHeaderTitle">Registrar Venta / Asignación</span>
+              </h3>
+              <form id="saleForm" onsubmit="handleSaleSubmit(event)" class="space-y-3">
+                <input type="hidden" id="editSaleId">
+                <div id="assignedVendorWrapper">
+                  <label class="block text-xs font-medium text-cyan-400 mb-1">Asignar a Vendedor (Registro)</label>
+                  <select id="assignedVendorSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"></select>
+                </div>
+
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <label class="block text-xs font-medium text-slate-300">Cliente / Usuario Final</label>
+                    <button type="button" onclick="openQuickClientModal()" class="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1">
+                      <i class="fa-solid fa-user-plus"></i> + Nuevo Cliente
+                    </button>
+                  </div>
+                  <select id="saleUser" required onchange="updateSaleContactInfo()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"></select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Número WhatsApp de Envío</label>
+                  <input type="tel" id="salePhone" required placeholder="Ej: 525512345678" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Plataforma Streaming</label>
+                  <select id="salePlatform" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"></select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Modalidad</label>
+                    <select id="saleType" onchange="toggleProfileFields()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                      <option value="perfil">Por Perfil</option>
+                      <option value="completa">Cuenta Completa</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Vigencia (Meses)</label>
+                    <select id="saleMonths" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                      <option value="1">1 Mes</option>
+                      <option value="2">2 Meses</option>
+                      <option value="3">3 Meses</option>
+                      <option value="6">6 Meses</option>
+                      <option value="12">12 Meses</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Correo Cuenta (Dominio Autorizado)</label>
+                    <input type="text" id="saleAccountEmail" required placeholder="cuenta@stream.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Clave Cuenta</label>
+                    <input type="text" id="saleAccountPass" required placeholder="Pass123" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                  </div>
+                </div>
+
+                <div id="profileFields" class="p-3 bg-slate-900/60 rounded-lg border border-slate-700/50 space-y-3">
+                  <p class="text-xs font-semibold text-cyan-400">Perfil Asignado</p>
+                  <div class="grid grid-cols-3 gap-2">
+                    <div>
+                      <label class="block text-[10px] text-slate-400 mb-1">N° Perfil</label>
+                      <input type="text" id="saleProfileNum" placeholder="3" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white">
+                    </div>
+                    <div>
+                      <label class="block text-[10px] text-slate-400 mb-1">Nombre</label>
+                      <input type="text" id="saleProfileName" placeholder="Juan" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white">
+                    </div>
+                    <div>
+                      <label class="block text-[10px] text-slate-400 mb-1">PIN</label>
+                      <input type="text" id="saleProfilePin" placeholder="1234" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white">
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Nota Personalizada</label>
+                  <textarea id="saleCustomText" rows="2" placeholder="Opcional..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white"></textarea>
+                </div>
+
+                <div class="flex gap-2">
+                  <button type="submit" id="btnSaveSale" class="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 rounded-lg text-sm transition shadow-lg shadow-cyan-600/20">Guardar & Enviar WA</button>
+                  <button type="button" onclick="resetSaleForm()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-2 rounded-lg text-sm transition">Cancelar</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="lg:col-span-2 space-y-6">
+              <!-- CARGA Y DESCARGA DE PLANTILLA EXCEL/CSV -->
+              <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                      <i class="fa-solid fa-file-excel text-emerald-400"></i> Carga Masiva de Cuentas por Excel/CSV
+                    </h3>
+                    <p class="text-xs text-slate-400">Selecciona cualquier usuario registrado al que se asignarán las cuentas del archivo. Solo se cargarán cuentas con dominios autorizados.</p>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button onclick="downloadCSVTemplate()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
+                      <i class="fa-solid fa-file-arrow-down"></i> Descargar Plantilla
+                    </button>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-700/60">
+                  <div>
+                    <label class="block text-xs font-medium text-cyan-400 mb-1">Asignar Cuentas del Excel a Usuario</label>
+                    <select id="csvTargetUserSelect" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"></select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Archivo CSV de Cuentas</label>
+                    <input type="file" id="csvSalesInput" accept=".csv" class="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 cursor-pointer" onchange="importCSV(event)">
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-base font-semibold text-white">Suscripciones Vendidas</h3>
+                  <div class="flex items-center gap-2">
+                    <button onclick="exportCSV('sales')" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow transition">
+                      <i class="fa-solid fa-file-csv"></i> Exportar
+                    </button>
+                  </div>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm text-left text-slate-300">
+                    <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                      <tr>
+                        <th class="px-3 py-3">Cliente / Asignado</th>
+                        <th class="px-3 py-3">Plataforma</th>
+                        <th class="px-3 py-3">Vencimiento</th>
+                        <th class="px-3 py-3 text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody id="salesTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 7.5 APARTADO: CUENTAS ASIGNADAS -->
+        <section id="assignedAccountsView" class="view-section hidden space-y-6">
+          <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                  <i class="fa-solid fa-address-book text-cyan-400"></i> Cuentas Asignadas (Global)
+                </h3>
+                <p class="text-xs text-slate-400">Visualiza, modifica o elimina cualquier cuenta asignada en el sistema.</p>
+              </div>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm text-left text-slate-300">
+                <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                  <tr>
+                    <th class="px-3 py-3">Usuario Asignado</th>
+                    <th class="px-3 py-3">Plataforma</th>
+                    <th class="px-3 py-3">Correo & Contraseña</th>
+                    <th class="px-3 py-3">Vencimiento</th>
+                    <th class="px-3 py-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="assignedAccountsTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 8. SOPORTE TÉCNICO -->
+        <section id="supportView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-headset text-red-400"></i> Generar Reporte de Soporte
+              </h3>
+              <form id="supportForm" onsubmit="handleSupportSubmit(event)" class="space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Cliente Afectado</label>
+                  <select id="supportUser" required onchange="populateUserAccountsForSupport()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Cuenta / Suscripción</label>
+                  <select id="supportSale" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Tipo de Problema</label>
+                  <select id="supportIssueType" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="Caída de Cuenta">Caída de Cuenta / Sin Acceso</option>
+                    <option value="Contraseña Incorrecta">Contraseña Incorrecta</option>
+                    <option value="Perfil Bloqueado">Perfil Bloqueado / PIN Incorrecto</option>
+                    <option value="Hogar Netflix">Pantalla de Hogar / Ubicación (Netflix)</option>
+                    <option value="Otro">Otro Inconveniente</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Detalle del Reporte</label>
+                  <textarea id="supportDetail" rows="3" required placeholder="Describe la falla reportada..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white font-medium py-2 rounded-lg text-sm transition">Crear Reporte de Falla</button>
+              </form>
+            </div>
+
+            <div class="lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white">Tickets y Reportes Activos</h3>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-slate-300">
+                  <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                    <tr>
+                      <th class="px-3 py-3">Cliente / WA</th>
+                      <th class="px-3 py-3">Plataforma / Cuenta</th>
+                      <th class="px-3 py-3">Problema / Solución</th>
+                      <th class="px-3 py-3">Estado</th>
+                      <th class="px-3 py-3 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="supportTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 9. RECORDATORIOS WHATSAPP -->
+        <section id="remindersView" class="view-section hidden space-y-6">
+          <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                  <i class="fa-brands fa-whatsapp text-emerald-400 text-lg"></i> Recordatorios Individuales de Renovación
+                </h3>
+              </div>
+              <select id="filterReminderState" onchange="renderReminders()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white">
+                <option value="all">Todas las cuentas</option>
+                <option value="expiring" selected>Por vencer (&lt; 5 días)</option>
+                <option value="expired">Ya Vencidas</option>
+              </select>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm text-left text-slate-300">
+                <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                  <tr>
+                    <th class="px-4 py-3">Cliente</th>
+                    <th class="px-4 py-3">Teléfono</th>
+                    <th class="px-4 py-3">Plataforma</th>
+                    <th class="px-4 py-3">Vencimiento</th>
+                    <th class="px-4 py-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="remindersTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 10. CONFIGURACIÓN GENERAL Y LOGOTIPO -->
+        <section id="settingsView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <!-- CONFIGURAR LOGOTIPO GLOBAL -->
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-image text-cyan-400"></i> Logotipo Global del Sistema
+              </h3>
+              <p class="text-xs text-slate-400">Sube una imagen o pega una URL para cambiar el logo del Login, Sidebar y Catálogo instantáneamente en todos los paneles.</p>
+              
+              <div class="space-y-3">
+                <div class="flex items-center gap-4">
+                  <div id="globalLogoPreview" class="w-16 h-16 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden">
+                    <i class="fa-solid fa-tv text-slate-600 text-2xl"></i>
+                  </div>
+                  <div class="flex-1 space-y-2">
+                    <input type="file" id="globalLogoFile" accept="image/*" onchange="handleGlobalLogoFile(event)" class="block w-full text-xs text-slate-400">
+                    <input type="text" id="globalLogoUrlInput" placeholder="O pega la URL de tu imagen aquí..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white">
+                  </div>
+                </div>
+                <button onclick="saveGlobalLogo()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs py-2 rounded-lg font-medium transition">Actualizar Logotipo Global</button>
+              </div>
+            </div>
+
+            <!-- EDITOR DE PLANTILLAS DE WHATSAPP -->
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-sliders text-cyan-400"></i> Editor de Plantillas de WhatsApp
+              </h3>
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">1. Mensaje de Entrega de Compra</label>
+                  <textarea id="tplCredentials" rows="4" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-mono"></textarea>
+                </div>
+                <button onclick="saveTemplates()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-4 py-2 rounded-lg font-medium transition">Guardar Plantillas</button>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- 11. PANEL CLIENTE -->
+        <section id="clientPortalView" class="view-section hidden space-y-6">
+          <div class="bg-gradient-to-r from-cyan-900/40 to-slate-800 border border-cyan-500/30 rounded-xl p-5 flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-white">¡Hola, <span id="clientPortalName">Cliente</span>!</h3>
+              <p class="text-xs text-slate-300">Consulta tus accesos activos y estado de tus plataformas.</p>
+            </div>
+            <button onclick="logout()" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg">Cerrar Sesión</button>
+          </div>
+
+          <div id="clientSubscriptionsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL REGISTRO RÁPIDO DE CLIENTE -->
+  <div id="modalQuickClient" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 w-full max-w-md space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-2">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+          <i class="fa-solid fa-user-plus text-cyan-400"></i> Registro Rápido de Cliente
+        </h3>
+        <button onclick="closeQuickClientModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form onsubmit="handleQuickClientSubmit(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Nombre Completo</label>
+          <input type="text" id="quickClientName" required placeholder="Ej: Maria Lopez" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">WhatsApp / Teléfono</label>
+          <input type="tel" id="quickClientPhone" placeholder="Ej: 525512345678" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Correo Electrónico (Dominio Autorizado)</label>
+          <input type="email" id="quickClientEmail" placeholder="cliente@dominio.com" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+        </div>
+
+        <div class="flex gap-2 justify-end pt-2">
+          <button type="button" onclick="closeQuickClientModal()" class="bg-slate-700 text-xs px-3 py-2 rounded-lg text-slate-300">Cancelar</button>
+          <button type="submit" class="bg-cyan-600 hover:bg-cyan-500 text-xs px-4 py-2 rounded-lg text-white font-medium shadow-lg shadow-cyan-600/20">Guardar & Seleccionar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL ASIGNAR SOLUCIÓN A TICKET DE SOPORTE -->
+  <div id="modalResolveTicket" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-lg space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+          <i class="fa-solid fa-screwdriver-wrench text-cyan-400"></i> Asignar Solución a Reporte
+        </h3>
+        <button onclick="closeResolveTicketModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form id="resolveTicketForm" onsubmit="handleResolveTicketSubmit(event)" class="space-y-4">
+        <input type="hidden" id="resolveTicketId">
+        
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Tipo de Solución Aplicada</label>
+          <select id="resolveActionType" onchange="toggleResolutionFields()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+            <option value="actualizar_password">Actualizar Contraseña de Cuenta</option>
+            <option value="actualizar_correo">Cambiar / Actualizar Correo y Contraseña</option>
+            <option value="actualizar_perfil">Restablecer Perfil o PIN</option>
+            <option value="nota">Nota Informativa / Solucionado sin cambios</option>
+          </select>
+        </div>
+
+        <div id="resFieldPass" class="space-y-3">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Nueva Contraseña para la Cuenta</label>
+            <input type="text" id="resNewPass" placeholder="Nueva clave de acceso..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+          </div>
+        </div>
+
+        <div id="resFieldEmail" class="space-y-3 hidden">
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Nuevo Correo para la Cuenta (Dominio Autorizado)</label>
+            <input type="text" id="resNewEmail" placeholder="nuevo@dominioautorizado.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white mb-2">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1">Nueva Contraseña Asociada al Nuevo Correo</label>
+            <input type="text" id="resNewEmailPass" placeholder="Clave para el nuevo correo..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+          </div>
+        </div>
+
+        <div id="resFieldProfile" class="space-y-3 hidden">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">Nuevo PIN</label>
+              <input type="text" id="resNewPin" placeholder="1234" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-white">
+            </div>
+            <div>
+              <label class="block text-[10px] text-slate-400 mb-1">Nombre Perfil</label>
+              <input type="text" id="resNewProfileName" placeholder="Juan" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-white">
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Detalle / Notas de la Solución</label>
+          <textarea id="resDetailNote" rows="3" required placeholder="Ej: Se restableció el acceso y se configuró nuevo PIN..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white"></textarea>
+        </div>
+
+        <div class="flex gap-2 justify-end pt-2">
+          <button type="button" onclick="closeResolveTicketModal()" class="bg-slate-700 text-xs px-4 py-2 rounded-lg text-slate-300">Cancelar</button>
+          <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-xs px-5 py-2 rounded-lg text-white font-medium shadow-lg shadow-emerald-600/20">Guardar Solución & Notificar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL EDITAR CUENTA ASIGNADA (CAMBIO DE CORREO, CONTRASEÑA O USUARIO) -->
+  <div id="modalEditAssignedAccount" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-lg space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+          <i class="fa-solid fa-pen-to-square text-cyan-400"></i> Modificar Cuenta Asignada
+        </h3>
+        <button onclick="closeEditAssignedAccountModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <form onsubmit="handleEditAssignedAccountSubmit(event)" class="space-y-4">
+        <input type="hidden" id="editAccSaleId">
+
+        <div>
+          <label class="block text-xs font-medium text-cyan-400 mb-1">Asignar a Usuario / Vendedor</label>
+          <select id="editAccUser" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"></select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Nuevo Correo (Dominio Autorizado)</label>
+          <input type="email" id="editAccEmail" required placeholder="correo@dominio.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1">Nueva Contraseña</label>
+          <input type="text" id="editAccPass" required placeholder="Clave de cuenta..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+        </div>
+
+        <div class="flex gap-2 justify-end pt-2">
+          <button type="button" onclick="closeEditAssignedAccountModal()" class="bg-slate-700 text-xs px-4 py-2 rounded-lg text-slate-300">Cancelar</button>
+          <button type="submit" class="bg-cyan-600 hover:bg-cyan-500 text-xs px-5 py-2 rounded-lg text-white font-medium shadow-lg shadow-cyan-600/20">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL VER DATOS NUEVOS DE SOPORTE RESUELTO -->
+  <div id="modalViewTicketDetails" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-md space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+          <i class="fa-solid fa-circle-info text-cyan-400"></i> Detalles de la Solución
+        </h3>
+        <button onclick="closeViewTicketDetailsModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div id="ticketDetailsContent" class="space-y-3 text-xs text-slate-300 font-mono bg-slate-900/80 p-4 rounded-lg border border-slate-700">
+        <!-- Se llena dinámicamente -->
+      </div>
+      <div class="flex justify-end pt-2">
+        <button type="button" onclick="closeViewTicketDetailsModal()" class="bg-cyan-600 hover:bg-cyan-500 text-xs px-4 py-2 rounded-lg text-white">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT INTEGRADO CON FIREBASE CLOUD FIRESTORE -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, setDoc, doc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAZ5m2OYaRQX4wJmLHJxhRaTdfy9hP0lgY",
+      authDomain: "panel-streaming-world.firebaseapp.com",
+      projectId: "panel-streaming-world",
+      storageBucket: "panel-streaming-world.firebasestorage.app",
+      messagingSenderId: "965699293208",
+      appId: "1:965699293208:web:6a940d788421361a6bf36d",
+      measurementId: "G-DJ9B4W726F"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const dbCloud = getFirestore(app);
+
+    const DEFAULT_LOGO = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230891b2'/><text x='50%' y='55%' font-size='42' font-weight='bold' fill='%23ffffff' text-anchor='middle' dominant-baseline='middle'>WE</text></svg>";
+
+    const DEFAULT_USERS = [
+      { id: '1', name: 'Mauricio Moreno', email: 'admin@stream.com', phone: '525512345678', pass: '123456', role: 'admin', status: 'activo' },
+      { id: '2', name: 'Carlos Revendedor', email: 'vendedor@stream.com', phone: '525598765432', pass: '123456', role: 'vendedor', status: 'activo' },
+      { id: '3', name: 'Juan Cliente', email: 'cliente@stream.com', phone: '525555555555', pass: '123456', role: 'cliente', status: 'activo' }
+    ];
+
+    window.db = {
+      users: DEFAULT_USERS,
+      domains: [{ id: '1', name: 'stream.com', note: 'Oficial' }],
+      bots: [],
+      platforms: [
+        { id: '1', name: 'NETFLIX', category: 'Video', logo: DEFAULT_LOGO, active: true },
+        { id: '2', name: 'DISNEY+', category: 'Video', logo: DEFAULT_LOGO, active: true }
+      ],
+      sales: [],
+      tickets: [],
+      notifications: [],
+      globalLogo: DEFAULT_LOGO,
+      templates: {
+        credentials: "*✅{plataforma}✅*\n\n*📧 Correo:* {correo}\n*🔑 Contraseña:* {password}\n*☑️Perfil:* {perfil}\n*🔑PIN:* {pin}\n*📍Vence:* {vencimiento}"
+      },
+      currentUser: JSON.parse(localStorage.getItem('st_cloud_current_user')) || null
+    };
+
+    // VALIDADOR DE DOMINIOS AUTORIZADOS
+    window.isDomainAuthorized = function(email) {
+      if(!email || !email.includes('@')) return false;
+      const domain = email.split('@')[1].trim().toLowerCase();
+      return window.db.domains.some(d => d.name.toLowerCase() === domain);
+    };
+
+    // SINCRONIZACIÓN DE DATOS CON FIRESTORE CLOUD
+    async function fetchCloudData() {
+      try {
+        const settingsSnap = await getDoc(doc(dbCloud, "settings", "global"));
+        if(settingsSnap.exists() && settingsSnap.data().logo) {
+          window.db.globalLogo = settingsSnap.data().logo;
+          localStorage.setItem('st_global_logo', window.db.globalLogo);
+        } else {
+          window.db.globalLogo = localStorage.getItem('st_global_logo') || DEFAULT_LOGO;
+        }
+
+        const uSnap = await getDocs(collection(dbCloud, "users"));
+        if (!uSnap.empty) {
+          window.db.users = [];
+          uSnap.forEach(d => window.db.users.push(d.data()));
+        }
+
+        const dSnap = await getDocs(collection(dbCloud, "domains"));
+        if (!dSnap.empty) {
+          window.db.domains = [];
+          dSnap.forEach(d => window.db.domains.push(d.data()));
+        }
+
+        const bSnap = await getDocs(collection(dbCloud, "bots"));
+        if (!bSnap.empty) {
+          window.db.bots = [];
+          bSnap.forEach(d => window.db.bots.push(d.data()));
+        }
+
+        const pSnap = await getDocs(collection(dbCloud, "platforms"));
+        if (!pSnap.empty) {
+          window.db.platforms = [];
+          pSnap.forEach(d => window.db.platforms.push(d.data()));
+        }
+
+        const sSnap = await getDocs(collection(dbCloud, "sales"));
+        if (!sSnap.empty) {
+          window.db.sales = [];
+          sSnap.forEach(d => window.db.sales.push(d.data()));
+        }
+
+        const tSnap = await getDocs(collection(dbCloud, "tickets"));
+        if (!tSnap.empty) {
+          window.db.tickets = [];
+          tSnap.forEach(d => window.db.tickets.push(d.data()));
+        }
+
+        const nSnap = await getDocs(collection(dbCloud, "notifications"));
+        if (!nSnap.empty) {
+          window.db.notifications = [];
+          nSnap.forEach(d => window.db.notifications.push(d.data()));
+        }
+      } catch (err) {
+        console.warn("Aviso de sincronización Firestore:", err);
+      }
+    }
+
+    async function saveDB() {
+      try {
+        for (let u of window.db.users) {
+          await setDoc(doc(dbCloud, "users", u.id), u);
+        }
+        for (let d of window.db.domains) {
+          await setDoc(doc(dbCloud, "domains", d.id), d);
+        }
+        for (let b of window.db.bots) {
+          await setDoc(doc(dbCloud, "bots", b.id), b);
+        }
+        for (let p of window.db.platforms) {
+          await setDoc(doc(dbCloud, "platforms", p.id), p);
+        }
+        for (let s of window.db.sales) {
+          await setDoc(doc(dbCloud, "sales", s.id), s);
+        }
+        for (let t of window.db.tickets) {
+          await setDoc(doc(dbCloud, "tickets", t.id), t);
+        }
+        for (let n of window.db.notifications) {
+          await setDoc(doc(dbCloud, "notifications", n.id), n);
+        }
+
+        if(window.db.currentUser) {
+          localStorage.setItem('st_cloud_current_user', JSON.stringify(window.db.currentUser));
+        }
+      } catch(e) {
+        console.error("Error al guardar en la nube:", e);
+      }
+    }
+
+    // POLLING EN TIEMPO REAL
+    async function backgroundSync() {
+      if(!window.db.currentUser) return;
+      await fetchCloudData();
+      renderStats();
+      renderNotificationsBadge();
+      const activeSection = document.querySelector('.view-section:not(.hidden)');
+      if(activeSection) {
+        if(activeSection.id === 'supportView') renderSupportTable();
+        if(activeSection.id === 'salesView') renderSalesTable();
+        if(activeSection.id === 'assignedAccountsView') renderAssignedAccountsTable();
+        if(activeSection.id === 'clientPortalView') renderClientPortal(window.db.currentUser);
+      }
+    }
+    setInterval(backgroundSync, 10000);
+
+    window.applyGlobalLogo = function() {
+      const activeLogo = window.db.globalLogo || localStorage.getItem('st_global_logo') || DEFAULT_LOGO;
+      const loginImg = document.getElementById('loginLogoImg');
+      const sidebarImg = document.getElementById('sidebarLogoImg');
+      const previewBox = document.getElementById('globalLogoPreview');
+
+      if(loginImg) loginImg.src = activeLogo;
+      if(sidebarImg) sidebarImg.src = activeLogo;
+      if(previewBox) previewBox.innerHTML = `<img src="${activeLogo}" class="w-full h-full object-cover">`;
+    }
+
+    let tempGlobalLogo = '';
+    window.handleGlobalLogoFile = function(e) {
+      const file = e.target.files[0];
+      if(file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          tempGlobalLogo = evt.target.result;
+          document.getElementById('platformLogoPreviewBox').innerHTML = `<img src="${tempGlobalLogo}" class="w-full h-full object-cover">`;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    window.saveGlobalLogo = async function() {
+      const urlInput = document.getElementById('globalLogoUrlInput').value.trim();
+      const finalLogo = tempGlobalLogo || urlInput;
+      if(!finalLogo) return alert('Por favor selecciona un archivo o ingresa una URL válida.');
+
+      window.db.globalLogo = finalLogo;
+      localStorage.setItem('st_global_logo', finalLogo);
+
+      try {
+        await setDoc(doc(dbCloud, "settings", "global"), { logo: finalLogo });
+      } catch(err) {
+        console.error("Error guardando logo en nube:", err);
+      }
+
+      window.applyGlobalLogo();
+      alert('¡Logotipo global actualizado y propagado a todos los paneles correctamente!');
+    }
+
+    // --- PORTAL DE CLIENTE ---
+    function renderClientPortal(user) {
+      const nameEl = document.getElementById('clientPortalName');
+      const gridEl = document.getElementById('clientSubscriptionsGrid');
+      if(nameEl) nameEl.innerText = user.name;
+      if(gridEl) {
+        const mySales = window.db.sales.filter(s => s.userId === user.id);
+        
+        if(mySales.length === 0) {
+          gridEl.innerHTML = `<div class="col-span-full p-6 text-center text-xs text-slate-400 bg-slate-800/40 rounded-xl border border-slate-700">No tienes cuentas asignadas en este momento. Contacta a tu vendedor.</div>`;
+          return;
+        }
+        
+        const activeLogo = window.db.globalLogo || DEFAULT_LOGO;
+        gridEl.innerHTML = mySales.map(s => {
+          const p = window.db.platforms.find(x => x.id === s.platformId);
+          return `
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 space-y-3 shadow-lg">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden">
+                    <img src="${p?.logo || activeLogo}" class="w-full h-full object-cover">
+                  </div>
+                  <div>
+                    <h4 class="font-bold text-white text-sm">${p ? p.name : 'Plataforma'}</h4>
+                    <span class="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 uppercase">${s.type || 'cuenta'}</span>
+                  </div>
+                </div>
+                <span class="text-xs text-slate-400 font-mono">Vence: ${s.endDate}</span>
+              </div>
+              <div class="p-3 bg-slate-900/80 rounded-lg border border-slate-700/50 space-y-1.5 text-xs font-mono">
+                <p><span class="text-slate-400">📧 Correo:</span> <span class="text-white select-all">${s.accountEmail}</span></p>
+                <p><span class="text-slate-400">🔑 Contraseña:</span> <span class="text-white select-all">${s.accountPass}</span></p>
+                ${s.type === 'perfil' ? `
+                  <div class="pt-1 border-t border-slate-800 flex justify-between text-[11px]">
+                    <span><span class="text-slate-400">Perfil:</span> <span class="text-cyan-400">${s.profileNum || '-'} (${s.profileName || ''})</span></span>
+                    <span><span class="text-slate-400">PIN:</span> <span class="text-yellow-400">${s.pin || 'Sin PIN'}</span></span>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+
+    // --- MODAL DE NUEVO CLIENTE ---
+    window.openQuickClientModal = function() {
+      const modal = document.getElementById('modalQuickClient');
+      if(modal) modal.classList.remove('hidden');
+    }
+
+    window.closeQuickClientModal = function() {
+      const modal = document.getElementById('modalQuickClient');
+      if(modal) modal.classList.add('hidden');
+    }
+
+    window.handleQuickClientSubmit = async function(e) {
+      e.preventDefault();
+      const name = document.getElementById('quickClientName').value.trim();
+      const phone = document.getElementById('quickClientPhone').value.trim().replace(/[^0-9]/g, '');
+      const email = document.getElementById('quickClientEmail').value.trim().toLowerCase();
+
+      if(!name || !phone || !email) return alert('Completa todos los campos obligatorios.');
+      if(!window.isDomainAuthorized(email)) return alert(`❌ El correo "${email}" no cuenta con un dominio autorizado en el sistema.`);
+
+      const newClient = {
+        id: Date.now().toString(),
+        name: name,
+        email: email,
+        phone: phone,
+        pass: '123456',
+        role: 'cliente',
+        status: 'activo',
+        createdBy: window.db.currentUser ? window.db.currentUser.id : '1'
+      };
+
+      window.db.users.push(newClient);
+      await saveDB();
+      populateDropdowns();
+
+      const saleUserSelect = document.getElementById('saleUser');
+      if(saleUserSelect) saleUserSelect.value = newClient.id;
+      updateSaleContactInfo();
+
+      closeQuickClientModal();
+      document.getElementById('quickClientName').value = '';
+      document.getElementById('quickClientPhone').value = '';
+      document.getElementById('quickClientEmail').value = '';
+      alert('¡Cliente registrado con éxito y seleccionado!');
+    }
+
+    // --- GESTIÓN DE PLATAFORMAS ---
+    let tempPlatformLogo = '';
+    window.handlePlatformLogoFile = function(e) {
+      const file = e.target.files[0];
+      if(file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          tempPlatformLogo = evt.target.result;
+          document.getElementById('platformLogoPreviewBox').innerHTML = `<img src="${tempPlatformLogo}" class="w-full h-full object-cover">`;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    window.handlePlatformSubmit = async function(e) {
+      e.preventDefault();
+      const id = document.getElementById('platformId').value;
+      const pName = document.getElementById('platformName').value.toUpperCase();
+      const category = document.getElementById('platformCategory').value.trim();
+      const urlLogoInput = document.getElementById('platformLogoUrlInput').value.trim();
+      
+      const existingP = id ? window.db.platforms.find(p => p.id === id) : null;
+      const logo = tempPlatformLogo || urlLogoInput || (existingP ? existingP.logo : (window.db.globalLogo || DEFAULT_LOGO));
+
+      if(id) {
+        const idx = window.db.platforms.findIndex(p => p.id === id);
+        if(idx !== -1) {
+          window.db.platforms[idx] = { ...window.db.platforms[idx], name: pName, category: category, logo: logo };
+        }
+      } else {
+        window.db.platforms.push({
+          id: Date.now().toString(),
+          name: pName,
+          category: category || 'Video',
+          logo: logo,
+          active: true
+        });
+      }
+
+      await saveDB();
+      resetPlatformForm();
+      renderPlatformsGrid();
+      populateDropdowns();
+      renderStats();
+      alert('¡Plataforma guardada con éxito!');
+    }
+
+    window.editPlatform = function(id) {
+      const p = window.db.platforms.find(x => x.id === id);
+      if(!p) return;
+      document.getElementById('platformId').value = p.id;
+      document.getElementById('platformName').value = p.name;
+      document.getElementById('platformCategory').value = p.category || '';
+      document.getElementById('platformLogoUrlInput').value = p.logo.startsWith('data:') ? '' : p.logo;
+      document.getElementById('platformLogoPreviewBox').innerHTML = `<img src="${p.logo}" class="w-full h-full object-cover">`;
+      document.getElementById('platformFormHeaderTitle').innerText = 'Editar Plataforma';
+      document.getElementById('btnSavePlatform').innerText = 'Actualizar Plataforma';
+      tempPlatformLogo = p.logo;
+    }
+
+    window.resetPlatformForm = function() {
+      document.getElementById('platformForm').reset();
+      document.getElementById('platformId').value = '';
+      document.getElementById('platformLogoPreviewBox').innerHTML = `<i class="fa-solid fa-tv text-slate-500"></i>`;
+      document.getElementById('platformFormHeaderTitle').innerText = 'Nueva Plataforma';
+      document.getElementById('btnSavePlatform').innerText = 'Guardar Plataforma';
+      tempPlatformLogo = '';
+    }
+
+    function renderPlatformsGrid() {
+      const grid = document.getElementById('platformsGrid');
+      if(!grid) return;
+      const activeLogo = window.db.globalLogo || DEFAULT_LOGO;
+      grid.innerHTML = window.db.platforms.map(p => `
+        <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0">
+              <img src="${p.logo || activeLogo}" class="w-full h-full object-cover">
+            </div>
+            <div>
+              <h4 class="font-bold text-white text-sm">${p.name}</h4>
+              <p class="text-xs text-slate-400">${p.category || 'General'}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1">
+            <button onclick="editPlatform('${p.id}')" class="p-1.5 bg-slate-700 hover:bg-slate-600 text-cyan-400 rounded-lg text-xs" title="Editar">
+              <i class="fa-solid fa-pen"></i>
+            </button>
+            <button onclick="deletePlatform('${p.id}')" class="p-1.5 bg-slate-700 hover:bg-slate-600 text-red-400 rounded-lg text-xs" title="Eliminar">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    window.deletePlatform = async function(id) {
+      if(confirm('¿Eliminar plataforma?')) {
+        await deleteDoc(doc(dbCloud, "platforms", id));
+        window.db.platforms = window.db.platforms.filter(p => p.id !== id);
+        renderPlatformsGrid();
+        renderStats();
+        populateDropdowns();
+      }
+    }
+
+    // --- APARTADO: CUENTAS ASIGNADAS (MODIFICAR Y BORRAR CON PERMISIVO TOTAL PARA VENDEDORES) ---
+    function renderAssignedAccountsTable() {
+      const tbody = document.getElementById('assignedAccountsTableBody');
+      if(!tbody) return;
+
+      const user = window.db.currentUser;
+      const isVendor = user && user.role === 'vendedor';
+      
+      let list = window.db.sales;
+      if(isVendor) {
+        list = window.db.sales.filter(s => {
+          if(s.vendorId === user.id) return true;
+          const assignedClient = window.db.users.find(u => u.id === s.userId);
+          if(assignedClient && assignedClient.createdBy === user.id) return true;
+          if(!s.vendorId) return true;
+          return false;
+        });
+      }
+
+      if(list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-6 text-center text-xs text-slate-400">No hay cuentas asignadas registradas.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = list.map(s => {
+        const u = window.db.users.find(x => x.id === s.userId);
+        const p = window.db.platforms.find(x => x.id === s.platformId);
+        const v = window.db.users.find(x => x.id === s.vendorId);
+        return `
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+            <td class="px-3 py-3">
+              <div class="font-medium text-white">${u ? u.name : 'N/A'}</div>
+              <div class="text-[10px] text-cyan-400">Cliente de: ${v ? v.name : 'Vendedor/Admin'}</div>
+            </td>
+            <td class="px-3 py-3 font-semibold text-cyan-300">${p ? p.name : 'N/A'}</td>
+            <td class="px-3 py-3 text-xs font-mono">
+              <div><span class="text-slate-400">Correo:</span> ${s.accountEmail}</div>
+              <div><span class="text-slate-400">Clave:</span> ${s.accountPass}</div>
+            </td>
+            <td class="px-3 py-3 text-xs">${s.endDate}</td>
+            <td class="px-3 py-3 text-right space-x-1">
+              <button onclick="openEditAssignedAccountModal('${s.id}')" class="text-cyan-400 hover:text-cyan-300 text-xs p-1.5 bg-slate-700/60 rounded" title="Modificar"><i class="fa-solid fa-pen"></i></button>
+              <button onclick="deleteAssignedAccount('${s.id}')" class="text-red-400 hover:text-red-300 text-xs p-1.5 bg-slate-700/60 rounded" title="Borrar"><i class="fa-solid fa-trash"></i></button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    window.openEditAssignedAccountModal = function(saleId) {
+      const sale = window.db.sales.find(s => s.id === saleId);
+      if(!sale) return;
+
+      document.getElementById('editAccSaleId').value = sale.id;
+      document.getElementById('editAccEmail').value = sale.accountEmail;
+      document.getElementById('editAccPass').value = sale.accountPass;
+
+      const userSelect = document.getElementById('editAccUser');
+      const currentUser = window.db.currentUser;
+      const isVendor = currentUser && currentUser.role === 'vendedor';
+      let targetUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === currentUser.id) : window.db.users;
+      
+      userSelect.innerHTML = targetUsers.map(u => `<option value="${u.id}" ${u.id === sale.userId ? 'selected' : ''}>${u.name} (${u.role.toUpperCase()})</option>`).join('');
+
+      document.getElementById('modalEditAssignedAccount').classList.remove('hidden');
+    }
+
+    window.closeEditAssignedAccountModal = function() {
+      document.getElementById('modalEditAssignedAccount').classList.add('hidden');
+    }
+
+    window.handleEditAssignedAccountSubmit = async function(e) {
+      e.preventDefault();
+      const saleId = document.getElementById('editAccSaleId').value;
+      const newUserId = document.getElementById('editAccUser').value;
+      const newEmail = document.getElementById('editAccEmail').value.trim().toLowerCase();
+      const newPass = document.getElementById('editAccPass').value.trim();
+
+      if(!window.isDomainAuthorized(newEmail)) return alert(`❌ El correo "${newEmail}" no pertenece a un dominio autorizado.`);
+
+      const sale = window.db.sales.find(s => s.id === saleId);
+      if(sale) {
+        sale.userId = newUserId;
+        sale.accountEmail = newEmail;
+        sale.accountPass = newPass;
+      }
+
+      await saveDB();
+      closeEditAssignedAccountModal();
+      renderAssignedAccountsTable();
+      renderSalesTable();
+      alert('¡Cuenta modificada con éxito!');
+    }
+
+    window.deleteAssignedAccount = async function(id) {
+      if(confirm('¿Estás seguro de eliminar / borrar esta cuenta asignada?')) {
+        await deleteDoc(doc(dbCloud, "sales", id));
+        window.db.sales = window.db.sales.filter(s => s.id !== id);
+        renderAssignedAccountsTable();
+        renderSalesTable();
+        renderStats();
+      }
+    }
+
+    // --- SISTEMA DE NOTIFICACIONES ---
+    function checkSystemNotifications() {
+      if(!window.db.currentUser) return;
+      const today = new Date();
+
+      window.db.sales.forEach(s => {
+        const endDate = new Date(s.endDate);
+        const diffTime = endDate - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if(diffDays >= 0 && diffDays <= 5) {
+          const u = window.db.users.find(x => x.id === s.userId);
+          const p = window.db.platforms.find(x => x.id === s.platformId);
+          const notifId = `expire_${s.id}`;
+          
+          if(!window.db.notifications.some(n => n.id === notifId)) {
+            window.db.notifications.push({
+              id: notifId,
+              targetRole: 'all',
+              vendorId: s.vendorId,
+              title: 'Cuenta por Vencer',
+              message: `La cuenta ${p ? p.name : ''} (${s.accountEmail}) de ${u ? u.name : 'Cliente'} vence en ${diffDays === 0 ? 'hoy' : diffDays + ' día(s)'}.`,
+              date: new Date().toISOString(),
+              read: false
+            });
+          }
+        }
+      });
+      renderNotificationsBadge();
+    }
+
+    function renderNotificationsBadge() {
+      const badge = document.getElementById('notifBadge');
+      const listContainer = document.getElementById('notifListContainer');
+      if(!badge || !listContainer) return;
+
+      const user = window.db.currentUser;
+      if(!user) return;
+
+      let userNotifs = window.db.notifications.filter(n => {
+        if(user.role === 'admin') return true;
+        if(user.role === 'vendedor') return n.targetRole === 'all' && (n.vendorId === user.id || !n.vendorId);
+        return false;
+      }).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+      const unreadCount = userNotifs.filter(n => !n.read).length;
+
+      if(unreadCount > 0) {
+        badge.innerText = unreadCount;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+
+      if(userNotifs.length === 0) {
+        listContainer.innerHTML = `<div class="p-4 text-center text-xs text-slate-400">No hay notificaciones nuevas.</div>`;
+        return;
+      }
+
+      listContainer.innerHTML = userNotifs.map(n => `
+        <div class="p-3 hover:bg-slate-700/40 transition ${n.read ? 'opacity-60' : 'bg-slate-800/80'}">
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-bold text-xs text-cyan-400">${n.title}</span>
+            <span class="text-[10px] text-slate-400">${n.date.split('T')[0]}</span>
+          </div>
+          <p class="text-xs text-slate-200">${n.message}</p>
+        </div>
+      `).join('');
+    }
+
+    window.toggleNotificationsDropdown = function() {
+      const dropdown = document.getElementById('notifDropdown');
+      if(dropdown) dropdown.classList.toggle('hidden');
+    }
+
+    window.markAllNotificationsAsRead = async function() {
+      window.db.notifications.forEach(n => n.read = true);
+      await saveDB();
+      renderNotificationsBadge();
+    }
+
+    // --- SOPORTE TÉCNICO & VISUALIZACIÓN DE RESPUESTAS ---
+    window.populateUserAccountsForSupport = function() {
+      const userId = document.getElementById('supportUser').value;
+      const saleSelect = document.getElementById('supportSale');
+      if(!saleSelect) return;
+
+      const userSales = window.db.sales.filter(s => s.userId === userId);
+      saleSelect.innerHTML = userSales.map(s => {
+        const p = window.db.platforms.find(x => x.id === s.platformId);
+        return `<option value="${s.id}">${p ? p.name : 'Plataforma'} - ${s.accountEmail} (Vence: ${s.endDate})</option>`;
+      }).join('');
+    }
+
+    window.handleSupportSubmit = async function(e) {
+      e.preventDefault();
+      const userId = document.getElementById('supportUser').value;
+      const saleId = document.getElementById('supportSale').value;
+      const issueType = document.getElementById('supportIssueType').value;
+      const detail = document.getElementById('supportDetail').value.trim();
+
+      const u = window.db.users.find(x => x.id === userId);
+      const s = window.db.sales.find(x => x.id === saleId);
+      const p = window.db.platforms.find(x => x.id === s?.platformId);
+
+      const ticket = {
+        id: Date.now().toString(),
+        userId: userId,
+        vendorId: s ? s.vendorId : '1',
+        saleId: saleId,
+        issueType: issueType,
+        detail: detail,
+        status: 'Pendiente',
+        resolution: '',
+        date: new Date().toISOString().split('T')[0]
+      };
+
+      window.db.tickets.push(ticket);
+
+      const newNotif = {
+        id: `ticket_${ticket.id}`,
+        targetRole: 'all',
+        vendorId: ticket.vendorId,
+        title: 'Nuevo Reporte de Soporte',
+        message: `El cliente ${u ? u.name : ''} reportó (${issueType}) en la cuenta ${p ? p.name : ''}.`,
+        date: new Date().toISOString(),
+        read: false
+      };
+      window.db.notifications.push(newNotif);
+
+      await saveDB();
+      document.getElementById('supportForm').reset();
+      renderSupportTable();
+      renderStats();
+      renderNotificationsBadge();
+      alert('¡Reporte de falla creado con éxito!');
+    }
+
+    function renderSupportTable() {
+      const tbody = document.getElementById('supportTableBody');
+      if(!tbody) return;
+
+      const user = window.db.currentUser;
+      const isVendor = user && user.role === 'vendedor';
+      const isClient = user && user.role === 'cliente';
+
+      let list = [];
+      if(isClient) {
+        list = window.db.tickets.filter(t => t.userId === user.id);
+      } else if(isVendor) {
+        list = window.db.tickets.filter(t => t.vendorId === user.id || !t.vendorId);
+      } else {
+        list = window.db.tickets;
+      }
+
+      tbody.innerHTML = list.map(t => {
+        const u = window.db.users.find(x => x.id === t.userId);
+        const s = window.db.sales.find(x => x.id === t.saleId);
+        const p = window.db.platforms.find(x => x.id === s?.platformId);
+
+        return `
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+            <td class="px-3 py-3">
+              <div class="font-medium text-white">${u ? u.name : 'N/A'}</div>
+              <div class="text-[10px] text-emerald-400">WA: ${u ? u.phone : ''}</div>
+            </td>
+            <td class="px-3 py-3">
+              <div class="font-medium text-cyan-400">${p ? p.name : 'N/A'}</div>
+              <div class="text-[10px] text-slate-400">${s ? s.accountEmail : ''}</div>
+            </td>
+            <td class="px-3 py-3 text-xs space-y-1">
+              <div><span class="font-bold text-red-300">Problema:</span> ${t.issueType}</div>
+              <p class="text-slate-400">${t.detail}</p>
+              ${t.resolution ? `
+                <div class="mt-1 p-2 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300">
+                  <strong>Respuesta:</strong> ${t.resolution}
+                </div>
+              ` : ''}
+            </td>
+            <td class="px-3 py-3">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${t.status === 'Solucionado' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}">${t.status}</span>
+            </td>
+            <td class="px-3 py-3 text-right">
+              ${t.status === 'Solucionado' ? `
+                <button onclick="openViewTicketDetailsModal('${t.id}')" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-2.5 py-1.5 rounded-lg transition shadow">
+                  <i class="fa-solid fa-eye"></i> Ver
+                </button>
+              ` : ''}
+              ${!isClient && t.status !== 'Solucionado' ? `
+                <button onclick="openResolveTicketModal('${t.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded-lg transition shadow">
+                  <i class="fa-solid fa-screwdriver-wrench"></i> Resolver
+                </button>
+              ` : ''}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    window.openResolveTicketModal = function(ticketId) {
+      document.getElementById('resolveTicketId').value = ticketId;
+      document.getElementById('resNewPass').value = '';
+      document.getElementById('resNewEmail').value = '';
+      document.getElementById('resNewEmailPass').value = '';
+      document.getElementById('resNewPin').value = '';
+      document.getElementById('resNewProfileName').value = '';
+      document.getElementById('resDetailNote').value = '';
+      toggleResolutionFields();
+      document.getElementById('modalResolveTicket').classList.remove('hidden');
+    }
+
+    window.closeResolveTicketModal = function() {
+      document.getElementById('modalResolveTicket').classList.add('hidden');
+    }
+
+    window.toggleResolutionFields = function() {
+      const type = document.getElementById('resolveActionType').value;
+      document.getElementById('resFieldPass').classList.toggle('hidden', type !== 'actualizar_password');
+      document.getElementById('resFieldEmail').classList.toggle('hidden', type !== 'actualizar_correo');
+      document.getElementById('resFieldProfile').classList.toggle('hidden', type !== 'actualizar_perfil');
+    }
+
+    window.handleResolveTicketSubmit = async function(e) {
+      e.preventDefault();
+      const ticketId = document.getElementById('resolveTicketId').value;
+      const actionType = document.getElementById('resolveActionType').value;
+      const note = document.getElementById('resDetailNote').value.trim();
+
+      const ticket = window.db.tickets.find(x => x.id === ticketId);
+      if(!ticket) return;
+
+      const sale = window.db.sales.find(x => x.id === ticket.saleId);
+      let solutionSummary = note;
+
+      if(sale) {
+        if(actionType === 'actualizar_password') {
+          const newPass = document.getElementById('resNewPass').value.trim();
+          if(newPass) {
+            sale.accountPass = newPass;
+            solutionSummary = `Contraseña actualizada a "${newPass}". ${note}`;
+          }
+        } else if(actionType === 'actualizar_correo') {
+          const newEmail = document.getElementById('resNewEmail').value.trim().toLowerCase();
+          const newEmailPass = document.getElementById('resNewEmailPass').value.trim();
+
+          if(!window.isDomainAuthorized(newEmail)) return alert(`❌ El nuevo correo "${newEmail}" no pertenece a un dominio autorizado.`);
+          if(newEmail) sale.accountEmail = newEmail;
+          if(newEmailPass) sale.accountPass = newEmailPass;
+
+          solutionSummary = `Correo actualizado a "${newEmail}" y contraseña a "${newEmailPass || 'sin cambios'}". ${note}`;
+        } else if(actionType === 'actualizar_perfil') {
+          const newPin = document.getElementById('resNewPin').value.trim();
+          const newProfName = document.getElementById('resNewProfileName').value.trim();
+          if(newPin) sale.pin = newPin;
+          if(newProfName) sale.profileName = newProfName;
+          solutionSummary = `Perfil actualizado (PIN: ${newPin || 'Sin cambios'}, Nombre: ${newProfName || 'Sin cambios'}). ${note}`;
+        }
+      }
+
+      ticket.status = 'Solucionado';
+      ticket.resolution = solutionSummary;
+
+      await saveDB();
+      closeResolveTicketModal();
+      renderSupportTable();
+      renderSalesTable();
+      renderAssignedAccountsTable();
+      renderStats();
+      alert('¡Solución asignada con éxito!');
+    }
+
+    window.openViewTicketDetailsModal = function(ticketId) {
+      const ticket = window.db.tickets.find(t => t.id === ticketId);
+      if(!ticket) return;
+      const sale = window.db.sales.find(s => s.id === ticket.saleId);
+      const p = window.db.platforms.find(x => x.id === sale?.platformId);
+
+      const content = document.getElementById('ticketDetailsContent');
+      content.innerHTML = `
+        <p><span class="text-slate-400">Problema:</span> ${ticket.issueType}</p>
+        <p><span class="text-slate-400">Detalle:</span> ${ticket.detail}</p>
+        <p><span class="text-slate-400">Plataforma:</span> ${p ? p.name : 'N/A'}</p>
+        <hr class="border-slate-700 my-2">
+        <p class="text-emerald-400 font-bold">Respuesta / Datos Nuevos:</p>
+        <p class="text-white">${ticket.resolution}</p>
+        ${sale ? `<div class="mt-2 p-2 bg-slate-950 rounded border border-slate-700"><strong>Correo Actual:</strong> ${sale.accountEmail}<br><strong>Contraseña Actual:</strong> ${sale.accountPass}</div>` : ''}
+      `;
+      document.getElementById('modalViewTicketDetails').classList.remove('hidden');
+    }
+
+    window.closeViewTicketDetailsModal = function() {
+      document.getElementById('modalViewTicketDetails').classList.add('hidden');
+    }
+
+    // --- AUTENTICACIÓN Y NAVEGACIÓN ---
+    window.handleLogin = function(e) {
+      e.preventDefault();
+      const alertBox = document.getElementById('loginAlert');
+      if (alertBox) alertBox.classList.add('hidden');
+
+      const emailInput = document.getElementById('loginEmail').value.trim().toLowerCase();
+      const passInput = document.getElementById('loginPass').value.trim();
+
+      const user = window.db.users.find(u => u.email && u.email.trim().toLowerCase() === emailInput && u.pass && u.pass.trim() === passInput);
+
+      if (!user) {
+        if (alertBox) {
+          alertBox.innerText = '❌ Credenciales incorrectas. Verifique el correo y la contraseña.';
+          alertBox.classList.remove('hidden');
+        }
+        return;
+      }
+
+      const userStatus = user.status ? user.status.toLowerCase() : 'activo';
+      if (userStatus === 'inactivo') {
+        if (alertBox) {
+          alertBox.innerText = '❌ Esta cuenta se encuentra inactiva.';
+          alertBox.classList.remove('hidden');
+        }
+        return;
+      }
+
+      window.db.currentUser = user;
+      localStorage.setItem('st_cloud_current_user', JSON.stringify(user));
+      
+      // AUTO-REPARACIÓN DE VENDORID AL INICIAR SESIÓN
+      if(user.role === 'vendedor') {
+        window.db.sales.forEach(s => {
+          if(!s.vendorId) s.vendorId = user.id;
+        });
+      }
+
+      setupNav();
+      renderAll();
+      window.applyGlobalLogo();
+      checkSystemNotifications();
+
+      if (user.role === 'cliente') {
+        const sidebar = document.getElementById('sidebar');
+        const mainHeader = document.getElementById('mainHeader');
+        if(sidebar) sidebar.classList.add('hidden');
+        if(mainHeader) mainHeader.classList.add('hidden');
+        renderClientPortal(user);
+        switchView('clientPortalView');
+      } else {
+        const sidebar = document.getElementById('sidebar');
+        const mainHeader = document.getElementById('mainHeader');
+        if(sidebar) sidebar.classList.remove('hidden');
+        if(mainHeader) mainHeader.classList.remove('hidden');
+        switchView('dashboardView');
+      }
+    }
+
+    window.logout = function() {
+      window.db.currentUser = null;
+      localStorage.removeItem('st_cloud_current_user');
+      const sidebar = document.getElementById('sidebar');
+      const mainHeader = document.getElementById('mainHeader');
+      if(sidebar) sidebar.classList.add('hidden');
+      if(mainHeader) mainHeader.classList.add('hidden');
+      switchView('loginView');
+    }
+
+    // GESTIÓN DE DOMINIOS
+    window.handleDomainSubmit = async function(e) {
+      e.preventDefault();
+      const name = document.getElementById('domainName').value.trim().replace(/^@/, '').toLowerCase();
+      const note = document.getElementById('domainNote').value.trim();
+      if(!name) return;
+
+      if(window.db.domains.some(d => d.name.toLowerCase() === name)) {
+        alert(`❌ El dominio "${name}" ya se encuentra registrado.`);
+        return;
+      }
+
+      window.db.domains.push({ id: Date.now().toString(), name: name, note: note || 'Autorizado' });
+      await saveDB();
+      document.getElementById('domainForm').reset();
+      renderDomainsTable();
+      populateDropdowns();
+      alert(`¡Dominio "@${name}" registrado con éxito!`);
+    }
+
+    function renderDomainsTable() {
+      const tbody = document.getElementById('domainsTableBody');
+      if(!tbody) return;
+      tbody.innerHTML = window.db.domains.map(d => `
+        <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+          <td class="px-4 py-3 font-mono text-cyan-400">@${d.name}</td>
+          <td class="px-4 py-3 text-slate-300 text-xs">${d.note || ''}</td>
+          <td class="px-4 py-3 text-right">
+            <button onclick="deleteDomain('${d.id}')" class="text-red-400 hover:text-red-300 text-xs p-1"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    window.deleteDomain = async function(id) {
+      if(window.db.domains.length <= 1) return alert('⚠️ Debe existir al menos un dominio autorizado.');
+      if(confirm('¿Eliminar dominio?')) {
+        await deleteDoc(doc(dbCloud, "domains", id));
+        window.db.domains = window.db.domains.filter(d => d.id !== id);
+        renderDomainsTable();
+        populateDropdowns();
+      }
+    }
+
+    // GESTIÓN DE BOTS
+    window.handleBotSubmit = async function(e) {
+      e.preventDefault();
+      const checkedBoxes = document.querySelectorAll('input[name="botDomainCheck"]:checked');
+      const selectedDomains = Array.from(checkedBoxes).map(cb => cb.value);
+
+      if(selectedDomains.length === 0) return alert('⚠️ Selecciona al menos un dominio.');
+
+      window.db.bots.push({
+        id: Date.now().toString(),
+        domains: selectedDomains,
+        name: document.getElementById('botName').value.trim(),
+        url: document.getElementById('botUrl').value.trim()
+      });
+
+      await saveDB();
+      document.getElementById('botForm').reset();
+      populateBotDomainCheckboxes();
+      renderBotsDisplay();
+      alert('¡Boot registrado con éxito!');
+    }
+
+    function populateBotDomainCheckboxes() {
+      const container = document.getElementById('botDomainsCheckboxes');
+      if(!container) return;
+      container.innerHTML = window.db.domains.map(d => `
+        <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer hover:text-white">
+          <input type="checkbox" name="botDomainCheck" value="${d.name}" class="rounded bg-slate-950 border-slate-700 text-cyan-600 focus:ring-cyan-500">
+          <span class="font-mono">@${d.name}</span>
+        </label>
+      `).join('');
+    }
+
+    window.renderBotsDisplay = function() {
+      const filterSelect = document.getElementById('filterVendorBotDomain');
+      const grid = document.getElementById('botsCardsGrid');
+      if(!filterSelect || !grid) return;
+
+      const currentSelectedFilter = filterSelect.value;
+      filterSelect.innerHTML = window.db.domains.map(d => `<option value="${d.name}" ${d.name === currentSelectedFilter ? 'selected' : ''}>@${d.name}</option>`).join('');
+
+      const selectedDomain = filterSelect.value;
+      const filteredBots = window.db.bots.filter(b => b.domains && b.domains.includes(selectedDomain));
+
+      if(filteredBots.length === 0) {
+        grid.innerHTML = `<div class="col-span-full p-6 text-center text-xs text-slate-400 bg-slate-900/40 rounded-xl border border-slate-800">No hay boots para @${selectedDomain}</div>`;
+        return;
+      }
+
+      grid.innerHTML = filteredBots.map(b => `
+        <div class="bg-slate-900/70 border border-slate-700/60 rounded-xl p-4 flex flex-col justify-between space-y-3 shadow-md">
+          <div>
+            <div class="flex items-center justify-between mb-1">
+              <h4 class="font-bold text-white text-sm">${b.name}</h4>
+              <button onclick="deleteBot('${b.id}')" class="text-red-400 hover:text-red-300 text-xs"><i class="fa-solid fa-trash"></i></button>
+            </div>
+            <div class="flex flex-wrap gap-1 mb-2">
+              ${b.domains.map(d => `<span class="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 text-[10px] font-mono">@${d}</span>`).join('')}
+            </div>
+            <p class="text-[11px] text-slate-400 truncate font-mono">${b.url}</p>
+          </div>
+          <a href="${b.url}" target="_blank" class="w-full bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 text-center py-2 rounded-lg text-xs font-medium transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-external-link-alt"></i> Ejecutar Boot
+          </a>
+        </div>
+      `).join('');
+    }
+
+    window.deleteBot = async function(id) {
+      if(confirm('¿Eliminar boot?')) {
+        await deleteDoc(doc(dbCloud, "bots", id));
+        window.db.bots = window.db.bots.filter(b => b.id !== id);
+        renderBotsDisplay();
+      }
+    }
+
+    // IMPORTACIÓN MASIVA CSV CORREGIDA Y FORZADA CON LOS ID DE USUARIO Y VENDEDOR
+    window.importCSV = async function(event) {
+      const file = event.target.files[0];
+      if(!file) return;
+
+      const targetUserId = document.getElementById('csvTargetUserSelect').value;
+      if(!targetUserId) return alert('⚠️ Selecciona primero el usuario o vendedor al que se asignarán las cuentas.');
+
+      const currentUser = window.db.currentUser;
+      const targetClientUser = window.db.users.find(u => u.id === targetUserId);
+      
+      let resolvedVendorId = '1';
+      if (currentUser && currentUser.role === 'vendedor') {
+        resolvedVendorId = currentUser.id;
+      } else if (targetClientUser && targetClientUser.createdBy) {
+        resolvedVendorId = targetClientUser.createdBy;
+      } else if (currentUser) {
+        resolvedVendorId = currentUser.id;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async function(e) {
+        const lines = e.target.result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if(lines.length < 2) return alert('El archivo CSV está vacío.');
+
+        let addedCount = 0;
+        let rejectedCount = 0;
+
+        for(let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(c => c.replace(/^"(.*)"$/, '$1').trim());
+          if(cols.length >= 4) {
+            const platformName = cols[2].toUpperCase();
+            const accountEmail = cols[3].toLowerCase();
+            const accountPass = cols[4] || '123456';
+            const profileNum = cols[5] || '1';
+            const pin = cols[6] || '';
+            const endDate = cols[7] || '2026-12-31';
+
+            if (!window.isDomainAuthorized(accountEmail)) {
+              rejectedCount++;
+              continue;
+            }
+
+            let p = window.db.platforms.find(x => x.name.toUpperCase() === platformName.toUpperCase());
+            if(!p) {
+              p = { id: Date.now().toString() + i, name: platformName, category: 'Video', logo: window.db.globalLogo || DEFAULT_LOGO, active: true };
+              window.db.platforms.push(p);
+            }
+
+            const saleId = Date.now().toString() + '_' + i;
+            window.db.sales.push({
+              id: saleId,
+              userId: targetUserId.toString(),
+              vendorId: resolvedVendorId.toString(),
+              phone: targetClientUser?.phone || cols[1] || '',
+              platformId: p.id,
+              type: 'perfil',
+              accountEmail: accountEmail,
+              accountPass: accountPass,
+              profileNum: profileNum,
+              pin: pin,
+              startDate: new Date().toISOString().split('T')[0],
+              endDate: endDate
+            });
+            addedCount++;
+          }
+        }
+        await saveDB();
+        renderAll();
+        event.target.value = '';
+        alert(`¡Carga masiva finalizada!\n✨ Nuevas cuentas agregadas: ${addedCount}\n❌ Rechazadas (Dominio no autorizado): ${rejectedCount}`);
+      };
+      reader.readAsText(file);
+    }
+
+    function setupNav() {
+      const nav = document.getElementById('mainNav');
+      const role = window.db.currentUser ? window.db.currentUser.role : 'guest';
+      
+      let items = [
+        { id: 'dashboardView', label: 'Dashboard', icon: 'fa-chart-pie', roles: ['admin', 'vendedor'] },
+        { id: 'usersView', label: 'Gestión Usuarios', icon: 'fa-users', roles: ['admin', 'vendedor'] },
+        { id: 'domainsView', label: 'Dominios Vendedores', icon: 'fa-globe', roles: ['admin'] },
+        { id: 'botsView', label: 'Boots / Bots', icon: 'fa-robot', roles: ['admin', 'vendedor'] },
+        { id: 'platformsView', label: 'Plataformas', icon: 'fa-tv', roles: ['admin'] },
+        { id: 'salesView', label: 'Ventas & Asignación', icon: 'fa-cart-shopping', roles: ['admin', 'vendedor'] },
+        { id: 'assignedAccountsView', label: 'Cuentas Asignadas', icon: 'fa-address-book', roles: ['admin', 'vendedor'] },
+        { id: 'supportView', label: 'Soporte Técnico', icon: 'fa-headset', roles: ['admin', 'vendedor', 'cliente'] },
+        { id: 'remindersView', label: 'Recordatorios WA', icon: 'fa-brands fa-whatsapp', roles: ['admin', 'vendedor'] },
+        { id: 'settingsView', label: 'Configuración & Logo', icon: 'fa-gear', roles: ['admin'] },
+      ];
+
+      nav.innerHTML = items.filter(i => i.roles.includes(role)).map(i => `
+        <button onclick="switchView('${i.id}')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+          <i class="fa-solid ${i.icon} w-5 text-center text-cyan-400"></i>
+          <span>${i.label}</span>
+        </button>
+      `).join('');
+
+      document.getElementById('userNameLabel').innerText = window.db.currentUser ? window.db.currentUser.name : 'Invitado';
+      document.getElementById('userRoleLabel').innerText = window.db.currentUser ? (window.db.currentUser.role === 'admin' ? 'SUPER ADMIN' : window.db.currentUser.role === 'vendedor' ? 'VENDEDOR' : 'CLIENTE') : 'GUEST';
+      document.getElementById('userAvatar').innerText = window.db.currentUser ? window.db.currentUser.name.substring(0, 2).toUpperCase() : '--';
+      document.getElementById('currentRoleBadge').innerText = window.db.currentUser ? (window.db.currentUser.role === 'admin' ? 'Super Admin' : window.db.currentUser.role === 'vendedor' ? 'Vendedor' : 'Cliente') : 'Invitado';
+    }
+
+    window.switchView = function(viewId) {
+      document.querySelectorAll('.view-section').forEach(s => s.classList.add('hidden'));
+      const target = document.getElementById(viewId);
+      if(target) target.classList.remove('hidden');
+      if(viewId === 'domainsView') renderDomainsTable();
+      if(viewId === 'botsView') { populateBotDomainCheckboxes(); renderBotsDisplay(); }
+      if(viewId === 'supportView') { renderSupportTable(); populateDropdowns(); }
+      if(viewId === 'assignedAccountsView') renderAssignedAccountsTable();
+      if(viewId === 'salesView') renderSalesTable();
+      if(viewId === 'clientPortalView' && window.db.currentUser) renderClientPortal(window.db.currentUser);
+    }
+
+    window.toggleSidebar = function() {
+      document.getElementById('sidebar').classList.toggle('hidden');
+    }
+
+    function renderAll() {
+      renderPlatformsGrid();
+      renderUsersTable();
+      renderDomainsTable();
+      populateBotDomainCheckboxes();
+      renderBotsDisplay();
+      renderStats();
+      populateDropdowns();
+      renderSalesTable();
+      renderAssignedAccountsTable();
+      renderSupportTable();
+      window.applyGlobalLogo();
+      checkSystemNotifications();
+      if(window.db.currentUser && window.db.currentUser.role === 'cliente') {
+        renderClientPortal(window.db.currentUser);
+      }
+    }
+
+    function renderStats() {
+      const isVendor = window.db.currentUser && window.db.currentUser.role === 'vendedor';
+      const mySales = isVendor ? window.db.sales.filter(s => s.vendorId === window.db.currentUser.id || !s.vendorId) : window.db.sales;
+      const myTickets = isVendor ? window.db.tickets.filter(t => t.vendorId === window.db.currentUser.id || !t.vendorId) : window.db.tickets;
+      const myUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === window.db.currentUser.id) : window.db.users.filter(u => u.role === 'cliente');
+
+      document.getElementById('statTotalUsers').innerText = myUsers.length;
+      document.getElementById('statTotalPlatforms').innerText = window.db.platforms.filter(p => p.active).length;
+      document.getElementById('statTotalSales').innerText = mySales.length;
+      document.getElementById('statPendingSupport').innerText = myTickets.filter(t => t.status !== 'Solucionado').length;
+    }
+
+    function populateDropdowns() {
+      const uSelect = document.getElementById('saleUser');
+      const pSelect = document.getElementById('salePlatform');
+      const vendorSelect = document.getElementById('assignedVendorSelect');
+      const supportUserSelect = document.getElementById('supportUser');
+      const csvTargetSelect = document.getElementById('csvTargetUserSelect');
+      const assignedVendorWrapper = document.getElementById('assignedVendorWrapper');
+
+      const currentUser = window.db.currentUser;
+      const isVendor = currentUser && currentUser.role === 'vendedor';
+
+      let availableUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === currentUser.id) : window.db.users.filter(u => u.role === 'cliente');
+
+      if(uSelect && pSelect) {
+        uSelect.innerHTML = availableUsers.map(u => `<option value="${u.id}">${u.name} (${u.phone || 'Sin tel'})</option>`).join('');
+        pSelect.innerHTML = window.db.platforms.filter(p => p.active).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+        updateSaleContactInfo();
+      }
+
+      if(csvTargetSelect) {
+        let csvTargetUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && (u.createdBy === currentUser.id || !u.createdBy)) : window.db.users;
+        if(csvTargetUsers.length === 0) csvTargetUsers = window.db.users;
+        csvTargetSelect.innerHTML = csvTargetUsers.map(u => `<option value="${u.id}">${u.name} (${u.email}) - [${u.role.toUpperCase()}]</option>`).join('');
+      }
+
+      if(supportUserSelect) {
+        supportUserSelect.innerHTML = availableUsers.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+        populateUserAccountsForSupport();
+      }
+
+      if(vendorSelect) {
+        if(isVendor) {
+          if(assignedVendorWrapper) assignedVendorWrapper.style.display = 'none';
+          vendorSelect.innerHTML = `<option value="${currentUser.id}">${currentUser.name}</option>`;
+        } else {
+          if(assignedVendorWrapper) assignedVendorWrapper.style.display = 'block';
+          const vendors = window.db.users.filter(u => u.role === 'vendedor' || u.role === 'admin');
+          const currentId = currentUser ? currentUser.id : '1';
+          vendorSelect.innerHTML = vendors.map(v => `<option value="${v.id}" ${v.id === currentId ? 'selected' : ''}>${v.name} (${v.role.toUpperCase()})</option>`).join('');
+        }
+      }
+    }
+
+    window.updateSaleContactInfo = function() {
+      const userId = document.getElementById('saleUser').value;
+      const u = window.db.users.find(x => x.id === userId);
+      const phoneInput = document.getElementById('salePhone');
+      if(u && phoneInput) phoneInput.value = u.phone || '';
+    }
+
+    window.toggleProfileFields = function() {
+      const type = document.getElementById('saleType').value;
+      const box = document.getElementById('profileFields');
+      if(type === 'perfil') box.classList.remove('hidden');
+      else box.classList.add('hidden');
+    }
+
+    window.handleSaleSubmit = async function(e) {
+      e.preventDefault();
+      const editId = document.getElementById('editSaleId').value;
+      const emailInput = document.getElementById('saleAccountEmail').value.trim().toLowerCase();
+
+      if (!window.isDomainAuthorized(emailInput)) {
+        return alert(`❌ El correo de cuenta "${emailInput}" no pertenece a un dominio autorizado. Registre el dominio primero.`);
+      }
+
+      const months = parseInt(document.getElementById('saleMonths').value);
+      const now = new Date();
+      const end = new Date();
+      end.setMonth(end.getMonth() + months);
+
+      const assignedVendorSelectEl = document.getElementById('assignedVendorSelect');
+      const currentUser = window.db.currentUser;
+      const assignedVendorId = (currentUser && currentUser.role === 'vendedor') ? currentUser.id : (assignedVendorSelectEl ? assignedVendorSelectEl.value : '1');
+
+      if (editId) {
+        const sale = window.db.sales.find(s => s.id === editId);
+        if (sale) {
+          sale.userId = document.getElementById('saleUser').value;
+          sale.vendorId = assignedVendorId;
+          sale.phone = document.getElementById('salePhone').value.replace(/[^0-9]/g, '');
+          sale.platformId = document.getElementById('salePlatform').value;
+          sale.type = document.getElementById('saleType').value;
+          sale.accountEmail = emailInput;
+          sale.accountPass = document.getElementById('saleAccountPass').value;
+          sale.profileNum = document.getElementById('saleProfileNum').value;
+          sale.profileName = document.getElementById('saleProfileName').value;
+          sale.pin = document.getElementById('saleProfilePin').value;
+          sale.endDate = end.toISOString().split('T')[0];
+          sale.customNote = document.getElementById('saleCustomText').value;
+        }
+      } else {
+        const sale = {
+          id: Date.now().toString(),
+          userId: document.getElementById('saleUser').value,
+          vendorId: assignedVendorId,
+          phone: document.getElementById('salePhone').value.replace(/[^0-9]/g, ''),
+          platformId: document.getElementById('salePlatform').value,
+          type: document.getElementById('saleType').value,
+          accountEmail: emailInput,
+          accountPass: document.getElementById('saleAccountPass').value,
+          profileNum: document.getElementById('saleProfileNum').value,
+          profileName: document.getElementById('saleProfileName').value,
+          pin: document.getElementById('saleProfilePin').value,
+          startDate: now.toISOString().split('T')[0],
+          endDate: end.toISOString().split('T')[0],
+          customNote: document.getElementById('saleCustomText').value
+        };
+        window.db.sales.push(sale);
+      }
+
+      await saveDB();
+      resetSaleForm();
+      renderAll();
+      alert('¡Venta / Asignación guardada con éxito!');
+    }
+
+    window.editSale = function(id) {
+      const s = window.db.sales.find(x => x.id === id);
+      if(!s) return;
+      document.getElementById('editSaleId').value = s.id;
+      const vendorSelect = document.getElementById('assignedVendorSelect');
+      if(vendorSelect) vendorSelect.value = s.vendorId;
+      document.getElementById('saleUser').value = s.userId;
+      updateSaleContactInfo();
+      document.getElementById('salePhone').value = s.phone;
+      document.getElementById('salePlatform').value = s.platformId;
+      document.getElementById('saleType').value = s.type;
+      toggleProfileFields();
+      document.getElementById('saleAccountEmail').value = s.accountEmail;
+      document.getElementById('saleAccountPass').value = s.accountPass;
+      document.getElementById('saleProfileNum').value = s.profileNum || '';
+      document.getElementById('saleProfileName').value = s.profileName || '';
+      document.getElementById('saleProfilePin').value = s.pin || '';
+      document.getElementById('saleCustomText').value = s.customNote || '';
+      
+      document.getElementById('saleFormHeaderTitle').innerText = 'Editar Suscripción';
+      document.getElementById('btnSaveSale').innerText = 'Actualizar Suscripción';
+    }
+
+    window.resetSaleForm = function() {
+      document.getElementById('saleForm').reset();
+      document.getElementById('editSaleId').value = '';
+      document.getElementById('saleFormHeaderTitle').innerText = 'Registrar Venta / Asignación';
+      document.getElementById('btnSaveSale').innerText = 'Guardar & Enviar WA';
+      updateSaleContactInfo();
+      toggleProfileFields();
+    }
+
+    function renderSalesTable() {
+      const tbody = document.getElementById('salesTableBody');
+      if(!tbody) return;
+      const user = window.db.currentUser;
+      const isVendor = user && user.role === 'vendedor';
+      
+      let list = window.db.sales;
+      if(isVendor) {
+        list = window.db.sales.filter(s => {
+          if(s.vendorId === user.id) return true;
+          const assignedClient = window.db.users.find(u => u.id === s.userId);
+          if(assignedClient && assignedClient.createdBy === user.id) return true;
+          if(!s.vendorId) return true;
+          return false;
+        });
+      }
+
+      tbody.innerHTML = list.map(s => {
+        const u = window.db.users.find(x => x.id === s.userId);
+        const p = window.db.platforms.find(x => x.id === s.platformId);
+        const v = window.db.users.find(x => x.id === s.vendorId);
+        return `
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+            <td class="px-3 py-3">
+              <div class="font-medium text-white">${u ? u.name : 'N/A'}</div>
+              <div class="text-[10px] text-cyan-400">Vendedor: ${v ? v.name : 'Admin'}</div>
+              <div class="text-xs text-slate-400">${s.accountEmail}</div>
+            </td>
+            <td class="px-3 py-3">${p ? p.name : 'N/A'}</td>
+            <td class="px-3 py-3 text-xs">${s.endDate}</td>
+            <td class="px-3 py-3 text-right space-x-1">
+              <button onclick="editSale('${s.id}')" class="text-cyan-400 hover:text-cyan-300 text-xs p-1.5 bg-slate-700/60 rounded" title="Editar"><i class="fa-solid fa-pen"></i></button>
+              <button onclick="deleteSale('${s.id}')" class="text-red-400 hover:text-red-300 text-xs p-1.5 bg-slate-700/60 rounded" title="Eliminar"><i class="fa-solid fa-trash"></i></button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    window.deleteSale = async function(id) {
+      if(confirm('¿Eliminar suscripción?')) {
+        await deleteDoc(doc(dbCloud, "sales", id));
+        window.db.sales = window.db.sales.filter(s => s.id !== id);
+        renderSalesTable();
+        renderAssignedAccountsTable();
+        renderStats();
+      }
+    }
+
+    window.downloadCSVTemplate = function() {
+      const headers = ["CLIENTE", "CELULAR", "PLATAFORMA", "CORREO", "CLAVE", "PERFIL", "PIN", "EXPIRACION"];
+      const sampleRow = ["Juan Perez", "525512345678", "NETFLIX", "correo@stream.com", "miClave123", "1", "1234", "2026-12-31"];
+      const csvContent = "\uFEFF" + [headers.join(','), sampleRow.join(',')].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `plantilla_asignacion_cuentas.csv`;
+      link.click();
+    }
+
+    // REGISTRO DE USUARIOS
+    window.handleUserSubmit = async function(e) {
+      e.preventDefault();
+      const id = document.getElementById('userId').value;
+      const roleSelect = document.getElementById('userRole') ? document.getElementById('userRole').value : 'cliente';
+      const emailInput = document.getElementById('userEmail').value.trim().toLowerCase();
+
+      if (!window.isDomainAuthorized(emailInput)) {
+        return alert(`❌ El correo "${emailInput}" no cuenta con un dominio autorizado en el sistema.`);
+      }
+
+      const uData = {
+        id: id || Date.now().toString(),
+        name: document.getElementById('userName').value.trim(),
+        email: emailInput,
+        phone: document.getElementById('userPhone').value.replace(/[^0-9]/g, ''),
+        pass: document.getElementById('userPassword').value.trim(),
+        role: roleSelect,
+        status: document.getElementById('userStatus').value,
+        createdBy: window.db.currentUser ? window.db.currentUser.id : '1'
+      };
+
+      if (id) {
+        const idx = window.db.users.findIndex(u => u.id === id);
+        if (idx !== -1) window.db.users[idx] = uData;
+      } else {
+        window.db.users.push(uData);
+      }
+
+      await saveDB();
+      resetUserForm();
+      renderUsersTable();
+      renderStats();
+      populateDropdowns();
+      alert('¡Usuario guardado con éxito!');
+    }
+
+    window.resetUserForm = function() {
+      document.getElementById('userForm').reset();
+      document.getElementById('userId').value = '';
+    }
+
+    function renderUsersTable() {
+      const tbody = document.getElementById('usersTableBody');
+      if(!tbody) return;
+      const search = document.getElementById('searchUser').value.toLowerCase();
+
+      const isVendor = window.db.currentUser && window.db.currentUser.role === 'vendedor';
+      let userList = isVendor 
+        ? window.db.users.filter(u => u.createdBy === window.db.currentUser.id) 
+        : window.db.users;
+
+      const filtered = userList.filter(u => u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search));
+
+      tbody.innerHTML = filtered.map(u => `
+        <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+          <td class="px-4 py-3">
+            <div class="font-medium text-white">${u.name}</div>
+            <div class="text-xs text-slate-400">${u.email}</div>
+          </td>
+          <td class="px-4 py-3 text-xs font-mono text-emerald-400">${u.phone || 'N/A'}</td>
+          <td class="px-4 py-3 capitalize"><span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300">${u.role}</span></td>
+          <td class="px-4 py-3 text-right space-x-2">
+            <button onclick="editUser('${u.id}')" class="text-cyan-400 hover:text-cyan-300"><i class="fa-solid fa-pen"></i></button>
+            <button onclick="deleteUser('${u.id}')" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    window.editUser = function(id) {
+      const u = window.db.users.find(x => x.id === id);
+      if(!u) return;
+      document.getElementById('userId').value = u.id;
+      document.getElementById('userName').value = u.name;
+      document.getElementById('userEmail').value = u.email;
+      document.getElementById('userPhone').value = u.phone || '';
+      document.getElementById('userPassword').value = u.pass;
+      document.getElementById('userRole').value = u.role;
+      document.getElementById('userStatus').value = u.status;
+    }
+
+    window.deleteUser = async function(id) {
+      if(confirm('¿Eliminar usuario?')) {
+        await deleteDoc(doc(dbCloud, "users", id));
+        window.db.users = window.db.users.filter(u => u.id !== id);
+        renderUsersTable();
+        renderStats();
+        populateDropdowns();
+      }
+    }
+
+    window.exportCSV = function(type) {
+      if (type === 'sales') {
+        let list = window.db.sales;
+        if (list.length === 0) return alert('Sin datos de ventas');
+        const headers = ["CLIENTE", "CELULAR", "PLATAFORMA", "CORREO", "CLAVE", "PERFIL", "PIN", "EXPIRACION"];
+        const rows = list.map(s => {
+          const u = window.db.users.find(x => x.id === s.userId);
+          const p = window.db.platforms.find(x => x.id === s.platformId);
+          return [`"${u ? u.name : 'N/A'}"`, `"${s.phone}"`, `"${p ? p.name : 'N/A'}"`, `"${s.accountEmail}"`, `"${s.accountPass}"`, `"${s.profileNum || '1'}"`, `"${s.pin || ''}"`, `"${s.endDate}"`].join(',');
+        });
+        const csvContent = "\uFEFF" + [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Ventas_World_Entretenimiento.csv`;
+        link.click();
+      }
+    }
+
+    window.exportAllJSON = function() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.db));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "respaldo_world_entretenimiento.json");
+      downloadAnchor.click();
+    }
+
+    // Inicialización al cargar la página
+    window.addEventListener('DOMContentLoaded', async () => {
+      await fetchCloudData();
+
+      let adminUser = window.db.users.find(u => u.email && u.email.toLowerCase() === 'admin@stream.com');
+      if (!adminUser) {
+        window.db.users.push(DEFAULT_USERS[0]);
+        await saveDB();
+      } else {
+        adminUser.role = 'admin';
+        adminUser.status = 'activo';
+      }
+
+      window.applyGlobalLogo();
+      checkSystemNotifications();
+      
+      if(window.db.currentUser) {
+        let found = window.db.users.find(u => u.id === window.db.currentUser.id || (u.email && window.db.currentUser.email && u.email.toLowerCase() === window.db.currentUser.email.toLowerCase()));
+        if(found) {
+          window.db.currentUser = found;
+          
+          if(window.db.currentUser.role === 'vendedor') {
+            window.db.sales.forEach(s => {
+              if(!s.vendorId) s.vendorId = window.db.currentUser.id;
+            });
+          }
+
+          setupNav();
+          renderAll();
+          if(window.db.currentUser.role === 'cliente') {
+            const sidebar = document.getElementById('sidebar');
+            const mainHeader = document.getElementById('mainHeader');
+            if(sidebar) sidebar.classList.add('hidden');
+            if(mainHeader) mainHeader.classList.add('hidden');
+            renderClientPortal(window.db.currentUser);
+            switchView('clientPortalView');
+          } else {
+            const sidebar = document.getElementById('sidebar');
+            const mainHeader = document.getElementById('mainHeader');
+            if(sidebar) sidebar.classList.remove('hidden');
+            if(mainHeader) mainHeader.classList.remove('hidden');
+            switchView('dashboardView');
+          }
+          return;
+        }
+      }
+
+      window.db.currentUser = null;
+      localStorage.removeItem('st_cloud_current_user');
+      switchView('loginView');
+    });
+  </script>
+</body>
+</html>
