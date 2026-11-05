@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-900 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Administración & Ventas - Streaming</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#f0f9ff', 500: '#06b6d4', 600: '#0891b2', 700: '#0e7490' }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="h-full bg-slate-900 text-slate-100 font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+  <div id="app" class="min-h-screen flex flex-col md:flex-row">
+    <!-- Sidebar / Menú Lateral -->
+    <aside id="sidebar" class="w-full md:w-64 bg-slate-950 border-r border-slate-800 flex flex-col justify-between transition-all duration-300 z-30">
+      <div>
+        <div class="p-4 flex items-center justify-between border-b border-slate-800">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-cyan-500/30">
+              <i class="fa-solid fa-play"></i>
+            </div>
+            <div>
+              <h1 class="font-bold text-base tracking-wide text-white">StreamAdmin</h1>
+              <span id="currentRoleBadge" class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-medium">Super Admin</span>
+            </div>
+          </div>
+        </div>
+
+        <nav class="p-3 space-y-1" id="mainNav"></nav>
+      </div>
+
+      <div class="p-3 border-t border-slate-800 space-y-2">
+        <button onclick="switchView('loginView')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-cyan-400 hover:bg-slate-800/80 transition-colors">
+          <i class="fa-solid fa-right-to-bracket text-lg"></i>
+          <span>Pantalla de Login</span>
+        </button>
+        <div class="pt-2 border-t border-slate-800 flex items-center justify-between px-2">
+          <div class="flex items-center gap-2">
+            <div id="userAvatar" class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs text-white">SA</div>
+            <div class="text-xs">
+              <p id="userNameLabel" class="font-medium text-white">Administrador</p>
+              <p id="userRoleLabel" class="text-slate-400 text-[10px]">Super Admin</p>
+            </div>
+          </div>
+          <button onclick="logout()" title="Cerrar Sesión" class="text-slate-400 hover:text-red-400 text-sm p-1.5 transition-colors">
+            <i class="fa-solid fa-power-off"></i>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Área Principal de Contenido -->
+    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto bg-slate-900">
+      <header class="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-20 px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-white p-2">
+            <i class="fa-solid fa-bars text-xl"></i>
+          </button>
+          <h2 id="pageTitle" class="text-lg font-semibold text-white">Dashboard Resumen</h2>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="exportAllJSON()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-slate-700 transition">
+            <i class="fa-solid fa-download text-cyan-400"></i>
+            <span class="hidden sm:inline">Respaldo JSON</span>
+          </button>
+          <button onclick="switchView('loginView')" class="text-xs bg-cyan-600 hover:bg-cyan-500 text-white px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-lg shadow-cyan-600/20 transition">
+            <i class="fa-solid fa-user-shield"></i>
+            <span>Ir a Login</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="p-4 md:p-6 space-y-6">
+
+        <!-- 1. DASHBOARD GENERAL -->
+        <section id="dashboardView" class="view-section space-y-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-medium text-slate-400">Usuarios / Clientes</p>
+                <h3 id="statTotalUsers" class="text-2xl font-bold text-white mt-1">0</h3>
+              </div>
+              <div class="w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 text-xl"><i class="fa-solid fa-users"></i></div>
+            </div>
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-medium text-slate-400">Plataformas Activas</p>
+                <h3 id="statTotalPlatforms" class="text-2xl font-bold text-white mt-1">0</h3>
+              </div>
+              <div class="w-12 h-12 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 text-xl"><i class="fa-solid fa-tv"></i></div>
+            </div>
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-medium text-slate-400">Ventas Totales</p>
+                <h3 id="statTotalSales" class="text-2xl font-bold text-white mt-1">0</h3>
+              </div>
+              <div class="w-12 h-12 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 text-xl"><i class="fa-solid fa-cart-shopping"></i></div>
+            </div>
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p class="text-xs font-medium text-slate-400">Reportes de Soporte</p>
+                <h3 id="statPendingSupport" class="text-2xl font-bold text-red-400 mt-1">0</h3>
+              </div>
+              <div class="w-12 h-12 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 text-xl"><i class="fa-solid fa-headset"></i></div>
+            </div>
+          </div>
+
+          <div class="bg-slate-800/50 border border-slate-700/60 rounded-xl p-5">
+            <h3 class="text-base font-semibold text-white mb-4 flex items-center gap-2">
+              <i class="fa-solid fa-list-check text-cyan-400"></i> Últimas Suscripciones Asignadas
+            </h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm text-left text-slate-300">
+                <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                  <tr>
+                    <th class="px-4 py-3">Cliente</th>
+                    <th class="px-4 py-3">Plataforma</th>
+                    <th class="px-4 py-3">Tipo</th>
+                    <th class="px-4 py-3">Vencimiento</th>
+                    <th class="px-4 py-3">Estado</th>
+                  </tr>
+                </thead>
+                <tbody id="dashSalesTable"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. GESTIÓN DE USUARIOS -->
+        <section id="usersView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 id="userFormTitle" class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-user-plus text-cyan-400"></i> Registrar Usuario / Cliente
+              </h3>
+              <form id="userForm" onsubmit="handleUserSubmit(event)" class="space-y-4">
+                <input type="hidden" id="userId">
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Nombre Completo</label>
+                  <input type="text" id="userName" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Correo Electrónico</label>
+                  <input type="email" id="userEmail" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">WhatsApp / Teléfono</label>
+                  <input type="tel" id="userPhone" placeholder="Ej: 525512345678" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Contraseña</label>
+                  <input type="text" id="userPassword" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Rol</label>
+                    <select id="userRole" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                      <option value="cliente">Cliente Final</option>
+                      <option value="vendedor" id="optRoleVendedor">Vendedor / Revendedor</option>
+                      <option value="admin" id="optRoleAdmin">Super Admin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Estado</label>
+                    <select id="userStatus" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                      <option value="activo">Activo</option>
+                      <option value="inactivo">Inactivo</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="pt-2 flex gap-2">
+                  <button type="submit" id="btnSaveUser" class="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 rounded-lg text-sm transition">Guardar Usuario</button>
+                  <button type="button" onclick="resetUserForm()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-2 rounded-lg text-sm transition">Cancelar</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <div class="flex items-center justify-between">
+                <h3 class="text-base font-semibold text-white">Directorio de Usuarios</h3>
+                <input type="text" id="searchUser" oninput="renderUsersTable()" placeholder="Buscar usuario..." class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white">
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-slate-300">
+                  <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                    <tr>
+                      <th class="px-4 py-3">Usuario</th>
+                      <th class="px-4 py-3">Contacto WA</th>
+                      <th class="px-4 py-3">Rol</th>
+                      <th class="px-4 py-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="usersTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. DOMINIOS PERMITIDOS -->
+        <section id="domainsView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-globe text-cyan-400"></i> Registrar Dominio Permitido
+              </h3>
+              <form id="domainForm" onsubmit="handleDomainSubmit(event)" class="space-y-4">
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Nombre del Dominio (sin @)</label>
+                  <input type="text" id="domainName" required placeholder="Ej: stream.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Nota</label>
+                  <input type="text" id="domainNote" placeholder="Ej: Vendedores oficiales" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 rounded-lg text-sm transition">Autorizar Dominio</button>
+              </form>
+            </div>
+
+            <div class="lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white">Dominios Autorizados para Vendedores</h3>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-slate-300">
+                  <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                    <tr>
+                      <th class="px-4 py-3">Dominio</th>
+                      <th class="px-4 py-3">Nota</th>
+                      <th class="px-4 py-3 text-right">Acción</th>
+                    </tr>
+                  </thead>
+                  <tbody id="domainsTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. PLATAFORMAS STREAMING -->
+        <section id="platformsView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 id="platformFormTitle" class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-tv text-cyan-400"></i> Nueva Plataforma
+              </h3>
+              <form id="platformForm" onsubmit="handlePlatformSubmit(event)" class="space-y-4">
+                <input type="hidden" id="platformId">
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Nombre Plataforma</label>
+                  <input type="text" id="platformName" required placeholder="Ej: NETFLIX" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Categoría</label>
+                  <input type="text" id="platformCategory" placeholder="Ej: Video" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Precio Base ($)</label>
+                  <input type="number" step="0.01" id="platformPrice" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div class="space-y-2">
+                  <label class="block text-xs font-medium text-slate-300">Logotipo</label>
+                  <div class="flex items-center gap-3">
+                    <div id="logoPreviewBox" class="w-12 h-12 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden">
+                      <i class="fa-solid fa-image text-slate-600 text-xl"></i>
+                    </div>
+                    <div class="flex-1 space-y-1">
+                      <input type="file" id="platformLogoFile" accept="image/*" onchange="handleLogoFileSelect(event)" class="block w-full text-xs text-slate-400">
+                      <input type="text" id="platformLogoUrl" oninput="handleLogoUrlInput(event)" placeholder="URL de imagen..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white">
+                    </div>
+                  </div>
+                </div>
+                <div class="pt-2 flex gap-2">
+                  <button type="submit" class="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 rounded-lg text-sm transition">Guardar</button>
+                  <button type="button" onclick="resetPlatformForm()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-2 rounded-lg text-sm transition">Cancelar</button>
+                </div>
+              </form>
+            </div>
+
+            <div class="lg:col-span-2 space-y-4">
+              <h3 class="text-base font-semibold text-white">Catálogo Global</h3>
+              <div id="platformsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. VENTAS DIRECTAS & ACCIONES DE RENOVACIÓN/PASSWORD -->
+        <section id="salesView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-cart-plus text-cyan-400"></i> Registrar Venta / Asignación
+              </h3>
+              <form id="saleForm" onsubmit="handleSaleSubmit(event)" class="space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Cliente / Usuario Final</label>
+                  <select id="saleUser" required onchange="updateSaleContactInfo()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"></select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Número WhatsApp de Envío</label>
+                  <input type="tel" id="salePhone" required placeholder="Ej: 525512345678" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Plataforma Streaming</label>
+                  <select id="salePlatform" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"></select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Modalidad</label>
+                    <select id="saleType" onchange="toggleProfileFields()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                      <option value="perfil">Por Perfil</option>
+                      <option value="completa">Cuenta Completa</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Vigencia (Meses)</label>
+                    <select id="saleMonths" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                      <option value="1">1 Mes</option>
+                      <option value="2">2 Meses</option>
+                      <option value="3">3 Meses</option>
+                      <option value="6">6 Meses</option>
+                      <option value="12">12 Meses</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Correo Cuenta</label>
+                    <input type="text" id="saleAccountEmail" required placeholder="cuenta@stream.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-slate-300 mb-1">Clave Cuenta</label>
+                    <input type="text" id="saleAccountPass" required placeholder="Pass123" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                  </div>
+                </div>
+
+                <div id="profileFields" class="p-3 bg-slate-900/60 rounded-lg border border-slate-700/50 space-y-3">
+                  <p class="text-xs font-semibold text-cyan-400">Perfil Asignado</p>
+                  <div class="grid grid-cols-3 gap-2">
+                    <div>
+                      <label class="block text-[10px] text-slate-400 mb-1">N° Perfil</label>
+                      <input type="text" id="saleProfileNum" placeholder="3" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white">
+                    </div>
+                    <div>
+                      <label class="block text-[10px] text-slate-400 mb-1">Nombre</label>
+                      <input type="text" id="saleProfileName" placeholder="Juan" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white">
+                    </div>
+                    <div>
+                      <label class="block text-[10px] text-slate-400 mb-1">PIN</label>
+                      <input type="text" id="saleProfilePin" placeholder="1234" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-white">
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Nota Personalizada</label>
+                  <textarea id="saleCustomText" rows="2" placeholder="Opcional..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white"></textarea>
+                </div>
+
+                <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 rounded-lg text-sm transition shadow-lg shadow-cyan-600/20">Guardar & Enviar WA</button>
+              </form>
+            </div>
+
+            <div class="lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <div class="flex items-center justify-between">
+                <h3 class="text-base font-semibold text-white">Suscripciones Vendidas</h3>
+                <button onclick="exportCSV('sales')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+                  <i class="fa-solid fa-file-csv"></i> Exportar
+                </button>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-slate-300">
+                  <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                    <tr>
+                      <th class="px-3 py-3">Cliente / Cuenta</th>
+                      <th class="px-3 py-3">Plataforma</th>
+                      <th class="px-3 py-3">Vencimiento</th>
+                      <th class="px-3 py-3 text-right">Acciones Rápidas</th>
+                    </tr>
+                  </thead>
+                  <tbody id="salesTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. SOPORTE TÉCNICO Y NOTIFICACIONES DE SOLUCIÓN -->
+        <section id="supportView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-headset text-red-400"></i> Generar Reporte de Soporte
+              </h3>
+              <form id="supportForm" onsubmit="handleSupportSubmit(event)" class="space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Cliente Afectado</label>
+                  <select id="supportUser" required onchange="populateUserAccountsForSupport()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Cuenta / Suscripción</label>
+                  <select id="supportSale" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"></select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Tipo de Problema</label>
+                  <select id="supportIssueType" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+                    <option value="Caída de Cuenta">Caída de Cuenta / Sin Acceso</option>
+                    <option value="Contraseña Incorrecta">Contraseña Incorrecta</option>
+                    <option value="Perfil Bloqueado">Perfil Bloqueado / PIN Incorrecto</option>
+                    <option value="Hogar Netflix">Pantalla de Hogar / Ubicación (Netflix)</option>
+                    <option value="Otro">Otro Inconveniente</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Detalle del Reporte</label>
+                  <textarea id="supportDetail" rows="3" required placeholder="Describe la falla reportada..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-red-600 hover:bg-red-500 text-white font-medium py-2 rounded-lg text-sm transition">Crear Reporte de Falla</button>
+              </form>
+            </div>
+
+            <div class="lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white">Tickets y Reportes Activos</h3>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left text-slate-300">
+                  <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                    <tr>
+                      <th class="px-3 py-3">Cliente / WA</th>
+                      <th class="px-3 py-3">Plataforma / Cuenta</th>
+                      <th class="px-3 py-3">Problema</th>
+                      <th class="px-3 py-3">Estado</th>
+                      <th class="px-3 py-3 text-right">Notificar Solución</th>
+                    </tr>
+                  </thead>
+                  <tbody id="supportTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 7. RECORDATORIOS WHATSAPP -->
+        <section id="remindersView" class="view-section hidden space-y-6">
+          <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                  <i class="fa-brands fa-whatsapp text-emerald-400 text-lg"></i> Recordatorios Individuales de Renovación
+                </h3>
+              </div>
+              <select id="filterReminderState" onchange="renderReminders()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white">
+                <option value="all">Todas las cuentas</option>
+                <option value="expiring" selected>Por vencer (&lt; 5 días)</option>
+                <option value="expired">Ya Vencidas</option>
+              </select>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm text-left text-slate-300">
+                <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
+                  <tr>
+                    <th class="px-4 py-3">Cliente</th>
+                    <th class="px-4 py-3">Teléfono</th>
+                    <th class="px-4 py-3">Plataforma</th>
+                    <th class="px-4 py-3">Vencimiento</th>
+                    <th class="px-4 py-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="remindersTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 8. CONFIGURACIÓN DE PLANTILLAS -->
+        <section id="settingsView" class="view-section hidden space-y-6">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-sliders text-cyan-400"></i> Editor de Plantillas de WhatsApp
+              </h3>
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">1. Mensaje de Entrega de Compra</label>
+                  <textarea id="tplCredentials" rows="6" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-mono"></textarea>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">2. Recordatorio de Renovación</label>
+                  <textarea id="tplReminder" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-mono"></textarea>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">3. Confirmación de Renovación Realizada</label>
+                  <textarea id="tplRenewSuccess" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-mono"></textarea>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">4. Actualización de Contraseña</label>
+                  <textarea id="tplPassUpdate" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-mono"></textarea>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-slate-300 mb-1">5. Notificación de Soporte Solucionado</label>
+                  <textarea id="tplSupportSolved" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white font-mono"></textarea>
+                </div>
+                <button onclick="saveTemplates()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-4 py-2 rounded-lg font-medium transition">Guardar Plantillas</button>
+              </div>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <i class="fa-solid fa-file-import text-emerald-400"></i> Importación Masiva (CSV)
+              </h3>
+              <p class="text-xs text-slate-400">Carga ventas con Cliente, Teléfono, Correo, Clave y Fecha de Vencimiento.</p>
+              <div class="p-3 bg-slate-900/60 border border-slate-700/50 rounded-lg flex items-center justify-between">
+                <p class="text-xs font-semibold text-white">Importar Suscripciones / Ventas</p>
+                <input type="file" id="csvSalesInput" accept=".csv" class="hidden" onchange="importCSV(event, 'sales')">
+                <button onclick="document.getElementById('csvSalesInput').click()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-3 py-1.5 rounded-lg">Cargar CSV</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 9. PANTALLA DE LOGIN -->
+        <section id="loginView" class="view-section hidden">
+          <div class="max-w-md mx-auto my-8 bg-slate-800/80 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-6">
+            <div class="text-center space-y-2">
+              <div class="w-14 h-14 rounded-2xl bg-cyan-600 mx-auto flex items-center justify-center text-white text-2xl shadow-lg shadow-cyan-600/30">
+                <i class="fa-solid fa-lock"></i>
+              </div>
+              <h3 class="text-xl font-bold text-white">Acceso de Clientes & Vendedores</h3>
+            </div>
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Correo Electrónico</label>
+                <input type="email" id="loginEmail" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-slate-300 mb-1">Contraseña</label>
+                <input type="password" id="loginPass" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+              </div>
+              <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2.5 rounded-lg text-sm transition">Iniciar Sesión</button>
+            </form>
+          </div>
+        </section>
+
+        <!-- 10. PANEL CLIENTE LOGUEADO -->
+        <section id="clientPortalView" class="view-section hidden space-y-6">
+          <div class="bg-gradient-to-r from-cyan-900/40 to-slate-800 border border-cyan-500/30 rounded-xl p-5 flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-bold text-white">¡Hola, <span id="clientPortalName">Cliente</span>!</h3>
+              <p class="text-xs text-slate-300">Consulta tus accesos activos y estado de tus plataformas.</p>
+            </div>
+            <button onclick="logout()" class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg">Cerrar Sesión</button>
+          </div>
+
+          <div id="clientSubscriptionsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL CAMBIAR CONTRASEÑA -->
+  <div id="modalPass" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 w-full max-w-md space-y-4">
+      <h3 class="text-base font-semibold text-white flex items-center gap-2">
+        <i class="fa-solid fa-key text-amber-400"></i> Actualizar Contraseña de Cuenta
+      </h3>
+      <input type="hidden" id="modalPassSaleId">
+      <div>
+        <label class="block text-xs text-slate-300 mb-1">Nueva Contraseña</label>
+        <input type="text" id="modalNewPassInput" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
+      </div>
+      <div class="flex gap-2 justify-end">
+        <button onclick="closeModalPass()" class="bg-slate-700 text-xs px-3 py-2 rounded-lg text-slate-300">Cancelar</button>
+        <button onclick="submitUpdatePass()" class="bg-amber-600 hover:bg-amber-500 text-xs px-4 py-2 rounded-lg text-white font-medium">Actualizar & Enviar WA</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT LÓGICA COMPLETA -->
+  <script>
+    const DEFAULT_CREDENTIALS = `*✅{plataforma}✅*
+
+*📧 Correo:* {correo}
+*🔑 Contraseña:* {password}
+
+*☑️Perfil:* {perfil}
+
+*🔑PIN:* {pin}
+
+*📍Vence:* {vencimiento}
+
+*📲Soporte:*GARANTIA 27 A 30 DIAS
+
+⚠ Recuerda no cambiar la configuración de la cuenta (correo, contraseña o nombre de perfil) para hacer válida la garantía
+
+*📣NO MODIFICAR NOMBRES DE PERFILES🌀*
+
+*🌀RECUERDA NOTIFICAR CUALQUIER INCONVENIENTE CON TU CUENTA PARA DARTE SOPORTE📣*
+ 
+*_♻ En caso de alguna falla se le cambia una cuenta nueva o se le levanta la cuenta_*
+
+*📆 Vigencia de 27 a 30 dias*
+
+*✅ Garantía Total*
+
+{nota_personalizada}`;
+
+    const DEFAULT_RENEWAL_CONFIRM = `*✅ RENOVACIÓN EXITOSA - {plataforma} ✅*
+
+Hola {cliente}, tu cuenta ha sido renovada correctamente.
+
+*📧 Correo:* {correo}
+*🔑 Contraseña:* {password}
+*📍Nueva Fecha de Vencimiento:* {vencimiento}
+
+¡Gracias por continuar con nosotros! 🙌`;
+
+    const DEFAULT_PASS_UPDATE = `*🔑 ACTUALIZACIÓN DE CONTRASEÑA - {plataforma} 🔑*
+
+Hola {cliente}, se ha actualizado la clave de tu cuenta:
+
+*📧 Correo:* {correo}
+*🔑 Nueva Contraseña:* {password}
+*☑️ Perfil:* {perfil}
+
+Por favor ingresa con tus nuevos datos.🏻`;
+
+    const DEFAULT_SUPPORT_SOLVED = `*🛠️ SOPORTE RESUELTO - {plataforma} 🛠️*
+
+Hola {cliente}, tu reporte para la cuenta *{correo}* ha sido SOLUCIONADO exitosamente.
+
+*🔑 Contraseña Actual:* {password}
+*☑️ Perfil:* {perfil}
+
+Ya puedes disfrutar nuevamente de tu servicio. Si tienes dudas, contáctanos.`;
+
+    let db = {
+      users: JSON.parse(localStorage.getItem('st_users')) || [
+        { id: '1', name: 'Mauricio Moreno', email: 'admin@stream.com', phone: '525512345678', pass: '123456', role: 'admin', status: 'activo' },
+        { id: '2', name: 'Carlos Revendedor', email: 'vendedor@stream.com', phone: '525598765432', pass: '123456', role: 'vendedor', status: 'activo' },
+        { id: '3', name: 'Juan Cliente', email: 'cliente@gmail.com', phone: '525555555555', pass: '123456', role: 'cliente', status: 'activo' }
+      ],
+      domains: JSON.parse(localStorage.getItem('st_domains')) || [{ id: '1', name: 'stream.com', note: 'Oficial' }],
+      platforms: JSON.parse(localStorage.getItem('st_platforms')) || [
+        { id: '1', name: 'NETFLIX', category: 'Video', price: 15.00, logo: '', active: true },
+        { id: '2', name: 'DISNEY+', category: 'Video', price: 10.00, logo: '', active: true }
+      ],
+      sales: JSON.parse(localStorage.getItem('st_sales')) || [
+        { id: '1', userId: '3', vendorId: '1', phone: '525555555555', platformId: '1', type: 'perfil', accountEmail: 'ana1363948@gmail.com', accountPass: 'Miami28', profileNum: '3', profileName: 'Juan', pin: '', startDate: '2026-08-25', endDate: '2026-09-25', customNote: '' }
+      ],
+      tickets: JSON.parse(localStorage.getItem('st_tickets')) || [],
+      templates: JSON.parse(localStorage.getItem('st_templates')) || {
+        credentials: DEFAULT_CREDENTIALS,
+        reminder: "Hola {cliente}, tu suscripción de {plataforma} vence en {dias_restantes} días ({vencimiento}). Por favor contáctanos para renovar.",
+        renewSuccess: DEFAULT_RENEWAL_CONFIRM,
+        passUpdate: DEFAULT_PASS_UPDATE,
+        supportSolved: DEFAULT_SUPPORT_SOLVED
+      },
+      currentUser: null
+    };
+
+    function saveDB() {
+      localStorage.setItem('st_users', JSON.stringify(db.users));
+      localStorage.setItem('st_domains', JSON.stringify(db.domains));
+      localStorage.setItem('st_platforms', JSON.stringify(db.platforms));
+      localStorage.setItem('st_sales', JSON.stringify(db.sales));
+      localStorage.setItem('st_tickets', JSON.stringify(db.tickets));
+      localStorage.setItem('st_templates', JSON.stringify(db.templates));
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      db.currentUser = db.users[0];
+      setupNav();
+      renderAll();
+    });
+
+    function setupNav() {
+      const nav = document.getElementById('mainNav');
+      const role = db.currentUser ? db.currentUser.role : 'guest';
+      
+      let items = [
+        { id: 'dashboardView', label: 'Dashboard', icon: 'fa-chart-pie', roles: ['admin', 'vendedor'] },
+        { id: 'usersView', label: role === 'vendedor' ? 'Registrar Clientes' : 'Gestión Usuarios', icon: 'fa-users', roles: ['admin', 'vendedor'] },
+        { id: 'domainsView', label: 'Dominios Vendedores', icon: 'fa-globe', roles: ['admin'] },
+        { id: 'platformsView', label: 'Plataformas', icon: 'fa-tv', roles: ['admin'] },
+        { id: 'salesView', label: 'Ventas & Asignación', icon: 'fa-cart-shopping', roles: ['admin', 'vendedor'] },
+        { id: 'supportView', label: 'Soporte Técnico', icon: 'fa-headset', roles: ['admin', 'vendedor'] },
+        { id: 'remindersView', label: 'Recordatorios WA', icon: 'fa-brands fa-whatsapp', roles: ['admin', 'vendedor'] },
+        { id: 'settingsView', label: 'Configuración', icon: 'fa-gear', roles: ['admin'] },
+      ];
+
+      nav.innerHTML = items
+        .filter(i => i.roles.includes(role))
+        .map(i => `
+          <button onclick="switchView('${i.id}')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
+            <i class="fa-solid ${i.icon} w-5 text-center text-cyan-400"></i>
+            <span>${i.label}</span>
+          </button>
+        `).join('');
+
+      document.getElementById('userNameLabel').innerText = db.currentUser ? db.currentUser.name : 'Invitado';
+      document.getElementById('userRoleLabel').innerText = db.currentUser ? db.currentUser.role.toUpperCase() : 'Guest';
+      document.getElementById('currentRoleBadge').innerText = db.currentUser ? (db.currentUser.role === 'admin' ? 'Super Admin' : 'Vendedor') : 'Cliente';
+    }
+
+    function switchView(viewId) {
+      document.querySelectorAll('.view-section').forEach(s => s.classList.add('hidden'));
+      const target = document.getElementById(viewId);
+      if(target) target.classList.remove('hidden');
+    }
+
+    function renderAll() {
+      renderStats();
+      renderUsersTable();
+      renderDomainsTable();
+      renderPlatformsGrid();
+      populateDropdowns();
+      renderSalesTable();
+      renderSupportTable();
+      renderReminders();
+      loadTemplates();
+    }
+
+    function renderStats() {
+      const isVendor = db.currentUser && db.currentUser.role === 'vendedor';
+      const mySales = isVendor ? db.sales.filter(s => s.vendorId === db.currentUser.id) : db.sales;
+
+      document.getElementById('statTotalUsers').innerText = db.users.filter(u => u.role === 'cliente').length;
+      document.getElementById('statTotalPlatforms').innerText = db.platforms.filter(p => p.active).length;
+      document.getElementById('statTotalSales').innerText = mySales.length;
+      document.getElementById('statPendingSupport').innerText = db.tickets.filter(t => t.status !== 'Solucionado').length;
+
+      const tbody = document.getElementById('dashSalesTable');
+      tbody.innerHTML = mySales.slice(-5).map(s => {
+        const u = db.users.find(x => x.id === s.userId);
+        const p = db.platforms.find(x => x.id === s.platformId);
+        return `
+          <tr class="border-b border-slate-800">
+            <td class="px-4 py-2.5 font-medium text-white">${u ? u.name : 'Desconocido'}</td>
+            <td class="px-4 py-2.5">${p ? p.name : 'Plataforma'}</td>
+            <td class="px-4 py-2.5 capitalize">${s.type}</td>
+            <td class="px-4 py-2.5">${s.endDate}</td>
+            <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400">Activa</span></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // RENOVACIÓN DE MESES Y CAMBIO DE CONTRASEÑA
+    function handleRenewSale(saleId, months) {
+      const s = db.sales.find(x => x.id === saleId);
+      if(!s) return;
+
+      const currentEnd = new Date(s.endDate);
+      const now = new Date();
+      const baseDate = currentEnd > now ? currentEnd : now;
+      
+      baseDate.setMonth(baseDate.getMonth() + parseInt(months));
+      s.endDate = baseDate.toISOString().split('T')[0];
+
+      saveDB();
+      renderAll();
+
+      const u = db.users.find(x => x.id === s.userId);
+      const p = db.platforms.find(x => x.id === s.platformId);
+      const targetPhone = s.phone || (u ? u.phone : '');
+
+      let msg = (db.templates.renewSuccess || DEFAULT_RENEWAL_CONFIRM)
+        .replace('{cliente}', u ? u.name : '')
+        .replace('{plataforma}', p ? p.name : 'Plataforma')
+        .replace('{correo}', s.accountEmail)
+        .replace('{password}', s.accountPass)
+        .replace('{vencimiento}', s.endDate);
+
+      const waUrl = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(waUrl, '_blank');
+    }
+
+    function openModalPass(saleId) {
+      const s = db.sales.find(x => x.id === saleId);
+      if(!s) return;
+      document.getElementById('modalPassSaleId').value = saleId;
+      document.getElementById('modalNewPassInput').value = s.accountPass;
+      document.getElementById('modalPass').classList.remove('hidden');
+    }
+
+    function closeModalPass() {
+      document.getElementById('modalPass').classList.add('hidden');
+    }
+
+    function submitUpdatePass() {
+      const saleId = document.getElementById('modalPassSaleId').value;
+      const newPass = document.getElementById('modalNewPassInput').value.trim();
+      const s = db.sales.find(x => x.id === saleId);
+      
+      if(s && newPass) {
+        s.accountPass = newPass;
+        saveDB();
+        closeModalPass();
+        renderAll();
+
+        const u = db.users.find(x => x.id === s.userId);
+        const p = db.platforms.find(x => x.id === s.platformId);
+        const targetPhone = s.phone || (u ? u.phone : '');
+
+        let msg = (db.templates.passUpdate || DEFAULT_PASS_UPDATE)
+          .replace('{cliente}', u ? u.name : '')
+          .replace('{plataforma}', p ? p.name : '')
+          .replace('{correo}', s.accountEmail)
+          .replace('{password}', newPass)
+          .replace('{perfil}', s.profileNum || '1');
+
+        const waUrl = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+        window.open(waUrl, '_blank');
+      }
+    }
+
+    // SOPORTE TÉCNICO
+    function populateUserAccountsForSupport() {
+      const userId = document.getElementById('supportUser').value;
+      const saleSelect = document.getElementById('supportSale');
+      const userSales = db.sales.filter(s => s.userId === userId);
+
+      saleSelect.innerHTML = userSales.map(s => {
+        const p = db.platforms.find(x => x.id === s.platformId);
+        return `<option value="${s.id}">${p ? p.name : 'Plataforma'} - ${s.accountEmail}</option>`;
+      }).join('');
+    }
+
+    function handleSupportSubmit(e) {
+      e.preventDefault();
+      const saleId = document.getElementById('supportSale').value;
+      const s = db.sales.find(x => x.id === saleId);
+      if(!s) return alert('Selecciona una cuenta válida.');
+
+      const ticket = {
+        id: Date.now().toString(),
+        saleId: s.id,
+        userId: s.userId,
+        issueType: document.getElementById('supportIssueType').value,
+        detail: document.getElementById('supportDetail').value,
+        status: 'Pendiente',
+        date: new Date().toISOString().split('T')[0]
+      };
+
+      db.tickets.push(ticket);
+      saveDB();
+      document.getElementById('supportForm').reset();
+      renderAll();
+      alert('Reporte de soporte creado con éxito.');
+    }
+
+    function changeTicketStatus(ticketId, newStatus) {
+      const t = db.tickets.find(x => x.id === ticketId);
+      if(t) {
+        t.status = newStatus;
+        saveDB();
+        renderSupportTable();
+      }
+    }
+
+    function notifySupportSolved(ticketId) {
+      const t = db.tickets.find(x => x.id === ticketId);
+      if(!t) return;
+      const s = db.sales.find(x => x.id === t.saleId);
+      const u = db.users.find(x => x.id === t.userId);
+      const p = s ? db.platforms.find(x => x.id === s.platformId) : null;
+      const targetPhone = s ? (s.phone || (u ? u.phone : '')) : (u ? u.phone : '');
+
+      let msg = (db.templates.supportSolved || DEFAULT_SUPPORT_SOLVED)
+        .replace('{cliente}', u ? u.name : '')
+        .replace('{plataforma}', p ? p.name : '')
+        .replace('{correo}', s ? s.accountEmail : '')
+        .replace('{password}', s ? s.accountPass : '')
+        .replace('{perfil}', s ? (s.profileNum || '1') : '1');
+
+      const waUrl = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(waUrl, '_blank');
+    }
+
+    function renderSupportTable() {
+      const tbody = document.getElementById('supportTableBody');
+      if(!tbody) return;
+
+      tbody.innerHTML = db.tickets.map(t => {
+        const u = db.users.find(x => x.id === t.userId);
+        const s = db.sales.find(x => x.id === t.saleId);
+        const p = s ? db.platforms.find(x => x.id === s.platformId) : null;
+
+        return `
+          <tr class="border-b border-slate-800">
+            <td class="px-3 py-3">
+              <div class="font-medium text-white">${u ? u.name : 'N/A'}</div>
+              <div class="text-xs text-emerald-400 font-mono">${s ? s.phone : ''}</div>
+            </td>
+            <td class="px-3 py-3">
+              <div class="text-xs text-cyan-400 font-bold">${p ? p.name : 'N/A'}</div>
+              <div class="text-[11px] text-slate-400">${s ? s.accountEmail : ''}</div>
+            </td>
+            <td class="px-3 py-3">
+              <span class="text-xs font-semibold text-amber-400">${t.issueType}</span>
+              <p class="text-[11px] text-slate-400">${t.detail}</p>
+            </td>
+            <td class="px-3 py-3">
+              <select onchange="changeTicketStatus('${t.id}', this.value)" class="bg-slate-900 border border-slate-700 rounded text-xs p-1 text-white">
+                <option value="Pendiente" ${t.status === 'Pendiente' ? 'selected' : ''}>Pendiente</option>
+                <option value="En Proceso" ${t.status === 'En Proceso' ? 'selected' : ''}>En Proceso</option>
+                <option value="Solucionado" ${t.status === 'Solucionado' ? 'selected' : ''}>Solucionado</option>
+              </select>
+            </td>
+            <td class="px-3 py-3 text-right">
+              ${t.status === 'Solucionado' ? `
+                <button onclick="notifySupportSolved('${t.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1 rounded flex items-center gap-1 ml-auto">
+                  <i class="fa-brands fa-whatsapp"></i> Notificar Solución
+                </button>
+              ` : `<span class="text-[10px] text-slate-500">Marcar solucionado</span>`}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // OTROS COMPONENTES
+    function renderSalesTable() {
+      const tbody = document.getElementById('salesTableBody');
+      if(!tbody) return;
+      const isVendor = db.currentUser && db.currentUser.role === 'vendedor';
+      let list = isVendor ? db.sales.filter(s => s.vendorId === db.currentUser.id) : db.sales;
+
+      tbody.innerHTML = list.map(s => {
+        const u = db.users.find(x => x.id === s.userId);
+        const p = db.platforms.find(x => x.id === s.platformId);
+        return `
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+            <td class="px-3 py-3">
+              <div class="font-medium text-white">${u ? u.name : 'N/A'}</div>
+              <div class="text-[11px] text-slate-400">${s.accountEmail}</div>
+            </td>
+            <td class="px-3 py-3">${p ? p.name : 'N/A'}</td>
+            <td class="px-3 py-3 text-xs">${s.endDate}</td>
+            <td class="px-3 py-3 text-right">
+              <div class="flex items-center justify-end gap-1.5">
+                <!-- Select Renovar -->
+                <select onchange="if(this.value) handleRenewSale('${s.id}', this.value)" class="bg-cyan-900/60 border border-cyan-700 text-cyan-200 text-xs rounded px-2 py-1">
+                  <option value="">+ Renovar</option>
+                  <option value="1">+1 Mes</option>
+                  <option value="2">+2 Meses</option>
+                  <option value="3">+3 Meses</option>
+                  <option value="6">+6 Meses</option>
+                  <option value="12">+12 Meses</option>
+                </select>
+
+                <!-- Botón Cambiar Clave -->
+                <button onclick="openModalPass('${s.id}')" title="Cambiar Contraseña" class="bg-amber-600 hover:bg-amber-500 text-white p-1.5 rounded text-xs">
+                  <i class="fa-solid fa-key"></i>
+                </button>
+
+                <!-- Botón WhatsApp Directo -->
+                <button onclick="sendWASale('${s.id}')" title="Enviar Datos" class="bg-emerald-600 hover:bg-emerald-500 text-white p-1.5 rounded text-xs">
+                  <i class="fa-brands fa-whatsapp"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderReminders() {
+      const tbody = document.getElementById('remindersTableBody');
+      if(!tbody) return;
+      const filter = document.getElementById('filterReminderState').value;
+      const now = new Date();
+
+      const filtered = db.sales.filter(s => {
+        const diff = Math.ceil((new Date(s.endDate) - now) / (1000 * 60 * 60 * 24));
+        if(filter === 'expiring') return diff >= 0 && diff <= 5;
+        if(filter === 'expired') return diff < 0;
+        return true;
+      });
+
+      tbody.innerHTML = filtered.map(s => {
+        const u = db.users.find(x => x.id === s.userId);
+        const p = db.platforms.find(x => x.id === s.platformId);
+        const diff = Math.ceil((new Date(s.endDate) - now) / (1000 * 60 * 60 * 24));
+
+        return `
+          <tr class="border-b border-slate-800">
+            <td class="px-4 py-3 font-medium text-white">${u ? u.name : 'N/A'}</td>
+            <td class="px-4 py-3 text-xs font-mono text-emerald-400">${s.phone || (u ? u.phone : 'N/A')}</td>
+            <td class="px-4 py-3">${p ? p.name : 'N/A'}</td>
+            <td class="px-4 py-3">${s.endDate}</td>
+            <td class="px-4 py-3 text-right">
+              <div class="flex items-center justify-end gap-2">
+                <select onchange="if(this.value) handleRenewSale('${s.id}', this.value)" class="bg-cyan-900/60 border border-cyan-700 text-cyan-200 text-xs rounded px-2 py-1">
+                  <option value="">+ Renovar</option>
+                  <option value="1">+1 Mes</option>
+                  <option value="2">+2 Meses</option>
+                  <option value="3">+3 Meses</option>
+                  <option value="6">+6 Meses</option>
+                  <option value="12">+12 Meses</option>
+                </select>
+                <button onclick="sendWAReminder('${s.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1 rounded">
+                  <i class="fa-brands fa-whatsapp"></i> Recordar
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function sendWASale(saleId) {
+      const s = db.sales.find(x => x.id === saleId);
+      if(!s) return;
+      const u = db.users.find(x => x.id === s.userId);
+      const p = db.platforms.find(x => x.id === s.platformId);
+      const targetPhone = s.phone || (u ? u.phone : '');
+
+      let msg = (db.templates.credentials || DEFAULT_CREDENTIALS)
+        .replace('{cliente}', u ? u.name : '')
+        .replace('{plataforma}', p ? p.name : 'STREAMING')
+        .replace('{correo}', s.accountEmail)
+        .replace('{password}', s.accountPass)
+        .replace('{perfil}', s.profileNum || s.profileName || '1')
+        .replace('{pin}', s.pin || '')
+        .replace('{vencimiento}', s.endDate)
+        .replace('{nota_personalizada}', s.customNote || '');
+
+      const waUrl = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(waUrl, '_blank');
+    }
+
+    function sendWAReminder(saleId) {
+      const s = db.sales.find(x => x.id === saleId);
+      if(!s) return;
+      const u = db.users.find(x => x.id === s.userId);
+      const p = db.platforms.find(x => x.id === s.platformId);
+      const diff = Math.ceil((new Date(s.endDate) - new Date()) / (1000 * 60 * 60 * 24));
+      const targetPhone = s.phone || (u ? u.phone : '');
+
+      let msg = db.templates.reminder
+        .replace('{cliente}', u ? u.name : '')
+        .replace('{plataforma}', p ? p.name : '')
+        .replace('{dias_restantes}', diff)
+        .replace('{vencimiento}', s.endDate);
+
+      const waUrl = targetPhone ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(waUrl, '_blank');
+    }
+
+    function loadTemplates() {
+      if(document.getElementById('tplCredentials')) document.getElementById('tplCredentials').value = db.templates.credentials;
+      if(document.getElementById('tplReminder')) document.getElementById('tplReminder').value = db.templates.reminder;
+      if(document.getElementById('tplRenewSuccess')) document.getElementById('tplRenewSuccess').value = db.templates.renewSuccess || DEFAULT_RENEWAL_CONFIRM;
+      if(document.getElementById('tplPassUpdate')) document.getElementById('tplPassUpdate').value = db.templates.passUpdate || DEFAULT_PASS_UPDATE;
+      if(document.getElementById('tplSupportSolved')) document.getElementById('tplSupportSolved').value = db.templates.supportSolved || DEFAULT_SUPPORT_SOLVED;
+    }
+
+    function saveTemplates() {
+      db.templates.credentials = document.getElementById('tplCredentials').value;
+      db.templates.reminder = document.getElementById('tplReminder').value;
+      db.templates.renewSuccess = document.getElementById('tplRenewSuccess').value;
+      db.templates.passUpdate = document.getElementById('tplPassUpdate').value;
+      db.templates.supportSolved = document.getElementById('tplSupportSolved').value;
+      saveDB();
+      alert('Plantillas de WhatsApp actualizadas correctamente.');
+    }
+
+    function populateDropdowns() {
+      const uSelect = document.getElementById('saleUser');
+      const pSelect = document.getElementById('salePlatform');
+      const supUserSelect = document.getElementById('supportUser');
+
+      if(uSelect && pSelect) {
+        const isVendor = db.currentUser && db.currentUser.role === 'vendedor';
+        let availableUsers = isVendor ? db.users.filter(u => u.role === 'cliente' && u.createdBy === db.currentUser.id) : db.users.filter(u => u.role === 'cliente');
+        uSelect.innerHTML = availableUsers.map(u => `<option value="${u.id}">${u.name} (${u.phone || 'Sin tel'})</option>`).join('');
+        pSelect.innerHTML = db.platforms.filter(p => p.active).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+        updateSaleContactInfo();
+      }
+
+      if(supUserSelect) {
+        supUserSelect.innerHTML = db.users.filter(u => u.role === 'cliente').map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+        populateUserAccountsForSupport();
+      }
+    }
+
+    function updateSaleContactInfo() {
+      const userId = document.getElementById('saleUser').value;
+      const u = db.users.find(x => x.id === userId);
+      const phoneInput = document.getElementById('salePhone');
+      if(u && phoneInput) phoneInput.value = u.phone || '';
+    }
+
+    function toggleProfileFields() {
+      const type = document.getElementById('saleType').value;
+      const box = document.getElementById('profileFields');
+      if(type === 'perfil') box.classList.remove('hidden');
+      else box.classList.add('hidden');
+    }
+
+    function handleSaleSubmit(e) {
+      e.preventDefault();
+      const months = parseInt(document.getElementById('saleMonths').value);
+      const now = new Date();
+      const end = new Date();
+      end.setMonth(end.getMonth() + months);
+
+      const sale = {
+        id: Date.now().toString(),
+        userId: document.getElementById('saleUser').value,
+        vendorId: db.currentUser ? db.currentUser.id : '1',
+        phone: document.getElementById('salePhone').value.replace(/[^0-9]/g, ''),
+        platformId: document.getElementById('salePlatform').value,
+        type: document.getElementById('saleType').value,
+        accountEmail: document.getElementById('saleAccountEmail').value,
+        accountPass: document.getElementById('saleAccountPass').value,
+        profileNum: document.getElementById('saleProfileNum').value,
+        profileName: document.getElementById('saleProfileName').value,
+        pin: document.getElementById('saleProfilePin').value,
+        startDate: now.toISOString().split('T')[0],
+        endDate: end.toISOString().split('T')[0],
+        customNote: document.getElementById('saleCustomText').value
+      };
+
+      db.sales.push(sale);
+      saveDB();
+      renderAll();
+      sendWASale(sale.id);
+    }
+
+    function handleDomainSubmit(e) {
+      e.preventDefault();
+      const rawDomain = document.getElementById('domainName').value.trim().toLowerCase().replace('@', '');
+      const note = document.getElementById('domainNote').value.trim();
+      if(!rawDomain) return;
+      if(db.domains.some(d => d.name === rawDomain)) return alert('Este dominio ya existe.');
+      db.domains.push({ id: Date.now().toString(), name: rawDomain, note: note || 'Autorizado' });
+      saveDB();
+      document.getElementById('domainForm').reset();
+      renderDomainsTable();
+    }
+
+    function deleteDomain(id) {
+      if(confirm('¿Eliminar dominio?')) {
+        db.domains = db.domains.filter(d => d.id !== id);
+        saveDB();
+        renderDomainsTable();
+      }
+    }
+
+    function renderDomainsTable() {
+      const tbody = document.getElementById('domainsTableBody');
+      if(!tbody) return;
+      tbody.innerHTML = db.domains.map(d => `
+        <tr class="border-b border-slate-800">
+          <td class="px-4 py-3 font-medium text-cyan-400">@${d.name}</td>
+          <td class="px-4 py-3 text-slate-300 text-xs">${d.note}</td>
+          <td class="px-4 py-3 text-right">
+            <button onclick="deleteDomain('${d.id}')" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function handleUserSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('userId').value;
+      const roleSelect = document.getElementById('userRole').value;
+      const email = document.getElementById('userEmail').value.trim().toLowerCase();
+      const assignedRole = (db.currentUser && db.currentUser.role === 'vendedor') ? 'cliente' : roleSelect;
+
+      if(assignedRole === 'vendedor') {
+        const domainParts = email.split('@');
+        if(domainParts.length !== 2) return alert('Email no válido');
+        const userDomain = domainParts[1];
+        if(!db.domains.some(d => d.name.toLowerCase() === userDomain)) {
+          return alert(`❌ El dominio "@${userDomain}" no está registrado para vendedores.`);
+        }
+      }
+
+      const uData = {
+        id: id || Date.now().toString(),
+        name: document.getElementById('userName').value,
+        email: email,
+        phone: document.getElementById('userPhone').value.replace(/[^0-9]/g, ''),
+        pass: document.getElementById('userPassword').value,
+        role: assignedRole,
+        status: document.getElementById('userStatus').value,
+        createdBy: db.currentUser ? db.currentUser.id : '1'
+      };
+
+      if(id) {
+        const idx = db.users.findIndex(u => u.id === id);
+        if(idx !== -1) db.users[idx] = uData;
+      } else db.users.push(uData);
+
+      saveDB();
+      resetUserForm();
+      renderAll();
+    }
+
+    function resetUserForm() {
+      document.getElementById('userForm').reset();
+      document.getElementById('userId').value = '';
+    }
+
+    function renderUsersTable() {
+      const tbody = document.getElementById('usersTableBody');
+      const search = document.getElementById('searchUser').value.toLowerCase();
+      const isVendor = db.currentUser && db.currentUser.role === 'vendedor';
+      let list = isVendor ? db.users.filter(u => u.role === 'cliente' && u.createdBy === db.currentUser.id) : db.users;
+      const filtered = list.filter(u => u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search));
+
+      tbody.innerHTML = filtered.map(u => `
+        <tr class="border-b border-slate-800 hover:bg-slate-800/40">
+          <td class="px-4 py-3">
+            <div class="font-medium text-white">${u.name}</div>
+            <div class="text-xs text-slate-400">${u.email}</div>
+          </td>
+          <td class="px-4 py-3 text-xs font-mono text-emerald-400">${u.phone || 'N/A'}</td>
+          <td class="px-4 py-3 capitalize"><span class="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300">${u.role}</span></td>
+          <td class="px-4 py-3 text-right space-x-2">
+            <button onclick="editUser('${u.id}')" class="text-cyan-400 hover:text-cyan-300"><i class="fa-solid fa-pen"></i></button>
+            <button onclick="deleteUser('${u.id}')" class="text-red-400 hover:text-red-300"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function editUser(id) {
+      const u = db.users.find(x => x.id === id);
+      if(!u) return;
+      document.getElementById('userId').value = u.id;
+      document.getElementById('userName').value = u.name;
+      document.getElementById('userEmail').value = u.email;
+      document.getElementById('userPhone').value = u.phone || '';
+      document.getElementById('userPassword').value = u.pass;
+      document.getElementById('userRole').value = u.role;
+      document.getElementById('userStatus').value = u.status;
+    }
+
+    function deleteUser(id) {
+      if(confirm('¿Eliminar usuario?')) {
+        db.users = db.users.filter(u => u.id !== id);
+        saveDB();
+        renderAll();
+      }
+    }
+
+    let tempLogoBase64 = '';
+    function handleLogoFileSelect(e) {
+      const file = e.target.files[0];
+      if(file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          tempLogoBase64 = evt.target.result;
+          document.getElementById('logoPreviewBox').innerHTML = `<img src="${tempLogoBase64}" class="w-full h-full object-cover">`;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function handleLogoUrlInput(e) {
+      const url = e.target.value;
+      if(url) {
+        tempLogoBase64 = url;
+        document.getElementById('logoPreviewBox').innerHTML = `<img src="${url}" class="w-full h-full object-cover">`;
+      }
+    }
+
+    function handlePlatformSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('platformId').value;
+      const pData = {
+        id: id || Date.now().toString(),
+        name: document.getElementById('platformName').value.toUpperCase(),
+        category: document.getElementById('platformCategory').value,
+        price: parseFloat(document.getElementById('platformPrice').value),
+        logo: tempLogoBase64,
+        active: true
+      };
+
+      if(id) {
+        const idx = db.platforms.findIndex(p => p.id === id);
+        if(idx !== -1) db.platforms[idx] = pData;
+      } else db.platforms.push(pData);
+
+      saveDB();
+      resetPlatformForm();
+      renderAll();
+    }
+
+    function resetPlatformForm() {
+      document.getElementById('platformForm').reset();
+      document.getElementById('platformId').value = '';
+      tempLogoBase64 = '';
+      document.getElementById('logoPreviewBox').innerHTML = `<i class="fa-solid fa-image text-slate-600 text-xl"></i>`;
+    }
+
+    function renderPlatformsGrid() {
+      const grid = document.getElementById('platformsGrid');
+      if(!grid) return;
+      grid.innerHTML = db.platforms.map(p => `
+        <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden">
+              ${p.logo ? `<img src="${p.logo}" class="w-full h-full object-cover">` : `<i class="fa-solid fa-tv text-cyan-400 text-xl"></i>`}
+            </div>
+            <div>
+              <h4 class="font-bold text-white text-sm">${p.name}</h4>
+              <p class="text-xs text-slate-400">${p.category} - $${p.price.toFixed(2)}</p>
+            </div>
+          </div>
+          <button onclick="togglePlatformState('${p.id}')" class="px-3 py-1 rounded text-xs font-semibold ${p.active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'}">
+            ${p.active ? 'Habilitada' : 'Inactiva'}
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function togglePlatformState(id) {
+      const p = db.platforms.find(x => x.id === id);
+      if(p) {
+        p.active = !p.active;
+        saveDB();
+        renderPlatformsGrid();
+      }
+    }
+
+    function importCSV(event, type) {
+      const file = event.target.files[0];
+      if(!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const lines = e.target.result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        if(lines.length < 2) return alert('El archivo está vacío.');
+
+        let addedCount = 0;
+        for(let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(c => c.replace(/^"(.*)"$/, '$1').trim());
+          if(cols.length >= 5) {
+            const clientName = cols[0];
+            const phone = cols[1].replace(/[^0-9]/g, '');
+            const platformName = cols[2].toUpperCase();
+            const accessType = cols[3].toLowerCase();
+            const accountEmail = cols[4];
+            const accountPass = cols[5] || '123456';
+            const profileNum = cols[6] || '1';
+            const pin = cols[7] || '';
+            const endDate = cols[8] || '2026-12-31';
+            const note = cols[9] || '';
+
+            let u = db.users.find(x => x.phone === phone || x.name.toLowerCase() === clientName.toLowerCase());
+            if(!u) {
+              u = { id: Date.now().toString() + i, name: clientName, email: `${phone || Date.now()}@cliente.com`, phone: phone, pass: '123456', role: 'cliente', status: 'activo', createdBy: db.currentUser ? db.currentUser.id : '1' };
+              db.users.push(u);
+            }
+
+            let p = db.platforms.find(x => x.name.toLowerCase() === platformName.toLowerCase());
+            if(!p) {
+              p = { id: Date.now().toString() + i, name: platformName, category: 'Video', price: 10.00, logo: '', active: true };
+              db.platforms.push(p);
+            }
+
+            db.sales.push({
+              id: Date.now().toString() + i,
+              userId: u.id,
+              vendorId: db.currentUser ? db.currentUser.id : '1',
+              phone: phone,
+              platformId: p.id,
+              type: accessType.includes('completa') ? 'completa' : 'perfil',
+              accountEmail: accountEmail,
+              accountPass: accountPass,
+              profileNum: profileNum,
+              profileName: clientName,
+              pin: pin,
+              startDate: new Date().toISOString().split('T')[0],
+              endDate: endDate,
+              customNote: note
+            });
+            addedCount++;
+          }
+        }
+
+        saveDB();
+        renderAll();
+        alert(`¡Importación exitosa! Se cargaron ${addedCount} suscripciones.`);
+      };
+      reader.readAsText(file);
+    }
+
+    function exportCSV(type) {
+      let data = type === 'users' ? db.users : (type === 'platforms' ? db.platforms : db.sales);
+      if(data.length === 0) return alert('Sin datos');
+      const keys = Object.keys(data[0]);
+      const csv = [keys.join(','), ...data.map(row => keys.map(k => `"${row[k]}"`).join(','))].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${type}.csv`;
+      link.click();
+    }
+
+    function exportAllJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "streamadmin_backup.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value;
+      const pass = document.getElementById('loginPass').value;
+      const user = db.users.find(u => u.email === email && u.pass === pass);
+      if(!user) return alert('Credenciales incorrectas');
+      db.currentUser = user;
+      setupNav();
+      renderAll();
+      if(user.role === 'cliente') {
+        renderClientPortal(user);
+        switchView('clientPortalView');
+      } else switchView('dashboardView');
+    }
+
+    function renderClientPortal(user) {
+      document.getElementById('clientPortalName').innerText = user.name;
+      const grid = document.getElementById('clientSubscriptionsGrid');
+      const mySales = db.sales.filter(s => s.userId === user.id);
+      grid.innerHTML = mySales.map(s => {
+        const p = db.platforms.find(x => x.id === s.platformId);
+        return `
+          <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-5 space-y-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-lg bg-cyan-600 flex items-center justify-center text-white font-bold">
+                <i class="fa-solid fa-play"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-white">${p ? p.name : 'Plataforma'}</h4>
+                <p class="text-xs text-slate-400 font-mono">Vence: ${s.endDate}</p>
+              </div>
+            </div>
+            <div class="p-3 bg-slate-900 rounded-lg text-xs space-y-1 font-mono">
+              <p><span class="text-slate-400">Correo:</span> ${s.accountEmail}</p>
+              <p><span class="text-slate-400">Clave:</span> ${s.accountPass}</p>
+              ${s.type === 'perfil' ? `<p><span class="text-slate-400">Perfil:</span> ${s.profileNum} | PIN: ${s.pin || 'Sin PIN'}</p>` : ''}
+              ${s.customNote ? `<p class="pt-1 text-cyan-400 border-t border-slate-800 mt-1">${s.customNote}</p>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function logout() {
+      db.currentUser = null;
+      switchView('loginView');
+    }
+  </script>
+</body>
+</html>
