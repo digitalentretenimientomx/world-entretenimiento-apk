@@ -297,7 +297,8 @@
         <!-- 5. BOOTS / BOTS STREAMING -->
         <section id="botsView" class="view-section hidden space-y-6">
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div id="botRegisterBox" class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4 hidden">
+            <!-- CAJA DE REGISTRO ESTRICTAMENTE OCULTA PARA VENDEDORES REGULARES -->
+            <div id="botRegisterBox" class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
               <h3 class="text-base font-semibold text-white flex items-center gap-2">
                 <i class="fa-solid fa-robot text-cyan-400"></i> Registro de Boot
               </h3>
@@ -318,7 +319,7 @@
               </form>
             </div>
 
-            <div id="botDisplayBox" class="lg:col-span-3 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6">
+            <div id="botDisplayBox" class="lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6">
               <div>
                 <h3 class="text-base font-semibold text-white mb-2 flex items-center gap-2">
                   <i class="fa-solid fa-satellite-dish text-cyan-400"></i> Centro de Operación de Boots
@@ -1732,7 +1733,7 @@
         populateBotDomainCheckboxes();
         renderBotsDisplay();
         
-        // Control riguroso de visibilidad: Oculta el registro si es vendedor regular
+        // VALIDACIÓN ESTRICTA: Solo 'admin' o 'vendedor_pro' pueden ver el registro de bots
         const registerBox = document.getElementById('botRegisterBox');
         const displayBox = document.getElementById('botDisplayBox');
         const user = window.db.currentUser;
