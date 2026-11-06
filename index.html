@@ -528,24 +528,28 @@
           </div>
         </section>
 
-        <!-- 7.5 APARTADO: CUENTAS ASIGNADAS -->
+        <!-- 7.5 APARTADO: CUENTAS ASIGNADAS (CON BARRA DE BÚSQUEDA Y SELECTOR MANUAL) -->
         <section id="assignedAccountsView" class="view-section hidden space-y-6">
           <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div>
                 <h3 class="text-base font-semibold text-white flex items-center gap-2">
                   <i class="fa-solid fa-address-book text-cyan-400"></i> Cuentas Asignadas (Global)
                 </h3>
-                <p class="text-xs text-slate-400">Visualiza, modifica o elimina cualquier cuenta asignada en el sistema.</p>
+                <p class="text-xs text-slate-400">Visualiza, busca, asigna vendedores o modifica cualquier cuenta en el sistema.</p>
+              </div>
+              <div class="w-full md:w-80">
+                <input type="text" id="assignedSearchInput" placeholder="Buscar por correo, servicio o cliente..." onkeyup="filterAssignedAccounts()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
               </div>
             </div>
             <div class="overflow-x-auto">
               <table class="w-full text-sm text-left text-slate-300">
                 <thead class="text-xs uppercase bg-slate-900/80 text-slate-400 border-b border-slate-700">
                   <tr>
-                    <th class="px-3 py-3">Usuario Asignado</th>
+                    <th class="px-3 py-3">Cliente Asignado</th>
                     <th class="px-3 py-3">Plataforma</th>
                     <th class="px-3 py-3">Correo & Contraseña</th>
+                    <th class="px-3 py-3">Vendedor Responsable</th>
                     <th class="px-3 py-3">Vencimiento</th>
                     <th class="px-3 py-3 text-right">Acciones</th>
                   </tr>
@@ -796,42 +800,6 @@
         <div class="flex gap-2 justify-end pt-2">
           <button type="button" onclick="closeResolveTicketModal()" class="bg-slate-700 text-xs px-4 py-2 rounded-lg text-slate-300">Cancelar</button>
           <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-xs px-5 py-2 rounded-lg text-white font-medium shadow-lg shadow-emerald-600/20">Guardar Solución & Notificar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- MODAL EDITAR CUENTA ASIGNADA (CAMBIO DE CORREO, CONTRASEÑA O USUARIO) -->
-  <div id="modalEditAssignedAccount" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 w-full max-w-lg space-y-4 shadow-2xl">
-      <div class="flex items-center justify-between border-b border-slate-700 pb-3">
-        <h3 class="text-base font-semibold text-white flex items-center gap-2">
-          <i class="fa-solid fa-pen-to-square text-cyan-400"></i> Modificar Cuenta Asignada
-        </h3>
-        <button onclick="closeEditAssignedAccountModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
-      </div>
-
-      <form onsubmit="handleEditAssignedAccountSubmit(event)" class="space-y-4">
-        <input type="hidden" id="editAccSaleId">
-
-        <div>
-          <label class="block text-xs font-medium text-cyan-400 mb-1">Asignar a Usuario / Vendedor</label>
-          <select id="editAccUser" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"></select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1">Nuevo Correo (Dominio Autorizado)</label>
-          <input type="email" id="editAccEmail" required placeholder="correo@dominio.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
-        </div>
-
-        <div>
-          <label class="block text-xs font-medium text-slate-300 mb-1">Nueva Contraseña</label>
-          <input type="text" id="editAccPass" required placeholder="Clave de cuenta..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white">
-        </div>
-
-        <div class="flex gap-2 justify-end pt-2">
-          <button type="button" onclick="closeEditAssignedAccountModal()" class="bg-slate-700 text-xs px-4 py-2 rounded-lg text-slate-300">Cancelar</button>
-          <button type="submit" class="bg-cyan-600 hover:bg-cyan-500 text-xs px-5 py-2 rounded-lg text-white font-medium shadow-lg shadow-cyan-600/20">Guardar Cambios</button>
         </div>
       </form>
     </div>
@@ -1251,7 +1219,7 @@
       }
     }
 
-    // --- APARTADO: CUENTAS ASIGNADAS (MODIFICAR Y BORRAR CON PERMISIVO TOTAL PARA VENDEDORES) ---
+    // --- APARTADO: CUENTAS ASIGNADAS (CON BUSCADOR Y CAMBIO MANUAL DE VENDEDOR) ---
     function renderAssignedAccountsTable() {
       const tbody = document.getElementById('assignedAccountsTableBody');
       if(!tbody) return;
@@ -1270,25 +1238,43 @@
         });
       }
 
+      const searchVal = document.getElementById('assignedSearchInput')?.value.toLowerCase() || '';
+      if(searchVal) {
+        list = list.filter(s => {
+          const u = window.db.users.find(x => x.id === s.userId);
+          const p = window.db.platforms.find(x => x.id === s.platformId);
+          const clientName = u ? u.name.toLowerCase() : '';
+          const platName = p ? p.name.toLowerCase() : '';
+          const email = s.accountEmail.toLowerCase();
+          return clientName.includes(searchVal) || platName.includes(searchVal) || email.includes(searchVal);
+        });
+      }
+
       if(list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-6 text-center text-xs text-slate-400">No hay cuentas asignadas registradas.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="px-3 py-6 text-center text-xs text-slate-400">No hay cuentas asignadas registradas.</td></tr>`;
         return;
       }
+
+      const allVendors = window.db.users.filter(u => u.role === 'vendedor' || u.role === 'admin');
 
       tbody.innerHTML = list.map(s => {
         const u = window.db.users.find(x => x.id === s.userId);
         const p = window.db.platforms.find(x => x.id === s.platformId);
-        const v = window.db.users.find(x => x.id === s.vendorId);
         return `
           <tr class="border-b border-slate-800 hover:bg-slate-800/30">
             <td class="px-3 py-3">
               <div class="font-medium text-white">${u ? u.name : 'N/A'}</div>
-              <div class="text-[10px] text-cyan-400">Cliente de: ${v ? v.name : 'Vendedor/Admin'}</div>
+              <div class="text-[10px] text-slate-400">${u ? u.email : ''}</div>
             </td>
             <td class="px-3 py-3 font-semibold text-cyan-300">${p ? p.name : 'N/A'}</td>
             <td class="px-3 py-3 text-xs font-mono">
               <div><span class="text-slate-400">Correo:</span> ${s.accountEmail}</div>
               <div><span class="text-slate-400">Clave:</span> ${s.accountPass}</div>
+            </td>
+            <td class="px-3 py-3">
+              <select onchange="updateAccountVendor('${s.id}', this.value)" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-500">
+                ${allVendors.map(v => `<option value="${v.id}" ${v.id === s.vendorId ? 'selected' : ''}>${v.name} (${v.role.toUpperCase()})</option>`).join('')}
+              </select>
             </td>
             <td class="px-3 py-3 text-xs">${s.endDate}</td>
             <td class="px-3 py-3 text-right space-x-1">
@@ -1298,6 +1284,20 @@
           </tr>
         `;
       }).join('');
+    }
+
+    window.filterAssignedAccounts = function() {
+      renderAssignedAccountsTable();
+    }
+
+    window.updateAccountVendor = async function(saleId, newVendorId) {
+      const sale = window.db.sales.find(s => s.id === saleId);
+      if(sale) {
+        sale.vendorId = newVendorId;
+        await saveDB();
+        renderAssignedAccountsTable();
+        renderSalesTable();
+      }
     }
 
     window.openEditAssignedAccountModal = function(saleId) {
@@ -1838,7 +1838,7 @@
       }
     }
 
-    // IMPORTACIÓN MASIVA CSV CORREGIDA Y FORZADA CON LOS ID DE USUARIO Y VENDEDOR
+    // IMPORTACIÓN MASIVA CSV
     window.importCSV = async function(event) {
       const file = event.target.files[0];
       if(!file) return;
