@@ -297,11 +297,17 @@
         <!-- 5. BOOTS / BOTS STREAMING -->
         <section id="botsView" class="view-section hidden space-y-6">
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- CAJA DE REGISTRO OCULTA PARA VENDEDORES REGULARES -->
             <div id="botRegisterBox" class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
               <h3 class="text-base font-semibold text-white flex items-center gap-2">
                 <i class="fa-solid fa-robot text-cyan-400"></i> Registro de Boot
               </h3>
+
+              <!-- ALERTA DINÁMICA DE CATEGORÍA -->
+              <div id="botPermissionAlert" class="hidden p-3 rounded-lg bg-red-500/20 border border-red-500/30 text-red-300 text-xs font-medium flex items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation text-red-400 flex-shrink-0"></i>
+                <span id="botPermissionAlertText">No cuenta con la categoría para realizar esta acción</span>
+              </div>
+
               <form id="botForm" onsubmit="handleBotSubmit(event)" class="space-y-4">
                 <div>
                   <label class="block text-xs font-medium text-slate-300 mb-2">Seleccionar Dominios Autorizados (Múltiples)</label>
@@ -1653,6 +1659,22 @@
 
     window.handleBotSubmit = async function(e) {
       e.preventDefault();
+      
+      const user = window.db.currentUser;
+      const alertBox = document.getElementById('botPermissionAlert');
+      const alertText = document.getElementById('botPermissionAlertText');
+
+      // Validar estrictamente si tiene categoría permitida (admin o vendedor_pro)
+      if (!user || (user.role !== 'admin' && user.role !== 'vendedor_pro')) {
+        if (alertBox && alertText) {
+          alertText.innerText = "No cuenta con la categoría para realizar esta acción";
+          alertBox.classList.remove('hidden');
+        }
+        return;
+      }
+
+      if (alertBox) alertBox.classList.add('hidden');
+
       const checked = Array.from(document.querySelectorAll('input[name="botDomainCheck"]:checked')).map(cb => cb.value);
       if(checked.length === 0) return alert('Selecciona al menos un dominio.');
       window.db.bots.push({ id: Date.now().toString(), domains: checked, name: document.getElementById('botName').value.trim(), url: document.getElementById('botUrl').value.trim() });
@@ -1737,19 +1759,23 @@
         populateBotDomainCheckboxes();
         renderBotsDisplay();
         
-        // VALIDACIÓN ESTRICTA: Solo 'admin' o 'vendedor_pro' pueden ver el registro de bots
+        // Control visual de la caja de registro según el rol actual
         const registerBox = document.getElementById('botRegisterBox');
         const displayBox = document.getElementById('botDisplayBox');
         const user = window.db.currentUser;
         const canRegisterBot = user && (user.role === 'admin' || user.role === 'vendedor_pro');
         
         if(registerBox) {
+          // Ocultar alerta previa al cambiar de vista
+          document.getElementById('botPermissionAlert')?.classList.add('hidden');
+          
           if(canRegisterBot) {
             registerBox.classList.remove('hidden');
             if(displayBox) displayBox.className = "lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6";
           } else {
-            registerBox.classList.add('hidden');
-            if(displayBox) displayBox.className = "lg:col-span-3 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6";
+            // Permitir ver la sección de registro pero bloqueada o mostrar el formulario con la restricción activa
+            registerBox.classList.remove('hidden');
+            if(displayBox) displayBox.className = "lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6";
           }
         }
       }
@@ -2015,7 +2041,6 @@
       if(window.db.currentUser) {
         let found = window.db.users.find(u => u.id === window.db.currentUser.id);
         if(found) {
-          // Asegurar que el rol cargado desde la BD conserve el valor actualizado
           if(window.db.currentUser.role) found.role = window.db.currentUser.role;
           window.db.currentUser = found;
           setupNav();
