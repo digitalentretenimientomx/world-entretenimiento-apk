@@ -1735,11 +1735,13 @@
       if(viewId === 'botsView') {
         populateBotDomainCheckboxes();
         renderBotsDisplay();
-        // Modificación 1: Ocultar el formulario de registro de boots para roles que no sean Admin o Vendedor Pro
+        
+        // Control de visibilidad correcto: Solo Admin o Vendedor Pro ven el registro de bots
         const registerBox = document.getElementById('botRegisterBox');
         const displayBox = document.getElementById('botDisplayBox');
         const user = window.db.currentUser;
         const canRegisterBot = user && (user.role === 'admin' || user.role === 'vendedor_pro');
+        
         if(registerBox) {
           if(canRegisterBot) {
             registerBox.classList.remove('hidden');
@@ -1945,7 +1947,6 @@
       document.getElementById('btnSaveUser').innerText = 'Guardar Usuario';
     }
 
-    // Modificación 3: Función para editar usuario desde el directorio
     window.editUser = function(id) {
       const u = window.db.users.find(x => x.id === id);
       if(!u) return;
@@ -1958,7 +1959,6 @@
       document.getElementById('userStatus').value = u.status || 'activo';
       document.getElementById('userFormTitle').innerHTML = `<i class="fa-solid fa-pen text-cyan-400"></i> Editar Usuario`;
       document.getElementById('btnSaveUser').innerText = 'Actualizar Usuario';
-      // Desplazar la vista hacia el formulario en pantallas pequeñas o medianas
       document.getElementById('userForm').scrollIntoView({ behavior: 'smooth' });
     }
 
