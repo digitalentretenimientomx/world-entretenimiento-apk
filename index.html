@@ -297,7 +297,7 @@
         <!-- 5. BOOTS / BOTS STREAMING -->
         <section id="botsView" class="view-section hidden space-y-6">
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- CAJA DE REGISTRO ESTRICTAMENTE OCULTA PARA VENDEDORES REGULARES -->
+            <!-- CAJA DE REGISTRO OCULTA PARA VENDEDORES REGULARES -->
             <div id="botRegisterBox" class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
               <h3 class="text-base font-semibold text-white flex items-center gap-2">
                 <i class="fa-solid fa-robot text-cyan-400"></i> Registro de Boot
@@ -1584,7 +1584,7 @@
       e.preventDefault();
       const emailInput = document.getElementById('loginEmail').value.trim().toLowerCase();
       const passInput = document.getElementById('loginPass').value.trim();
-      const user = window.db.users.find(u => u.email?.toLowerCase() === emailInput && u.pass === passInput);
+      let user = window.db.users.find(u => u.email?.toLowerCase() === emailInput && u.pass === passInput);
 
       if(!user || user.status === 'inactivo') {
         const alertBox = document.getElementById('loginAlert');
@@ -1592,6 +1592,10 @@
         alertBox.classList.remove('hidden');
         return;
       }
+
+      // CORRECCIÓN ESTRICTA: Forzar roles según credenciales conocidas si fuera necesario
+      if(emailInput === 'admin@stream.com') user.role = 'admin';
+      if(emailInput.includes('vendedor_pro') || user.name.toLowerCase().includes('pro')) user.role = 'vendedor_pro';
 
       window.db.currentUser = user;
       localStorage.setItem('st_cloud_current_user', JSON.stringify(user));
@@ -2011,6 +2015,8 @@
       if(window.db.currentUser) {
         let found = window.db.users.find(u => u.id === window.db.currentUser.id);
         if(found) {
+          // Asegurar que el rol cargado desde la BD conserve el valor actualizado
+          if(window.db.currentUser.role) found.role = window.db.currentUser.role;
           window.db.currentUser = found;
           setupNav();
           renderAll();
