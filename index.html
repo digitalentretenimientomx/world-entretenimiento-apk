@@ -908,6 +908,20 @@
       return window.db.domains.some(d => d.name.toLowerCase() === domain);
     };
 
+    // Función auxiliar robusta para convertir fechas con guiones o diagonales a objetos Date válidos
+    function parseLocalDate(dateStr) {
+      if (!dateStr) return new Date(NaN);
+      // Si viene en formato DD/MM/YYYY (ej: 01/12/2026)
+      if (dateStr.includes('/')) {
+        const parts = dateStr.split('/');
+        if (parts.length === 3) {
+          return new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00`);
+        }
+      }
+      // Formato estándar YYYY-MM-DD
+      return new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
+    }
+
     async function fetchCloudData() {
       try {
         const settingsSnap = await getDoc(doc(dbCloud, "settings", "global"));
@@ -1034,7 +1048,7 @@
       alert('¡Plantillas de WhatsApp guardadas con éxito!');
     }
 
-    // --- RENDERIZADO DE RECORDATORIOS Y SUBMENÚS DE PLANTILLAS ---
+    // --- RENDERIZADO DE RECORDATORIOS Y CÁLCULO SEGURO DE FECHAS ---
     window.renderReminders = function() {
       const tbody = document.getElementById('remindersTableBody');
       const filterState = document.getElementById('filterReminderState')?.value || 'expiring';
@@ -1058,13 +1072,14 @@
       today.setHours(0,0,0,0);
 
       const processedList = list.map(s => {
-        const endDate = new Date(s.endDate + 'T00:00:00');
+        const endDate = parseLocalDate(s.endDate);
         const diffTime = endDate - today;
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return { sale: s, diffDays };
+        return { sale: s, diffDays, isValidDate: !isNaN(diffTime) };
       });
 
       let filtered = processedList.filter(item => {
+        if (!item.isValidDate) return false;
         if(filterState === 'expiring') return item.diffDays >= 0 && item.diffDays <= 5;
         if(filterState === 'expired') return item.diffDays < 0;
         return true; // 'all'
@@ -1138,7 +1153,7 @@
 
       const today = new Date();
       today.setHours(0,0,0,0);
-      const endDate = new Date(sale.endDate + 'T00:00:00');
+      const endDate = parseLocalDate(sale.endDate);
       const diffTime = endDate - today;
       const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
@@ -1422,10 +1437,10 @@
       today.setHours(0,0,0,0);
 
       window.db.sales.forEach(s => {
-        const endDate = new Date(s.endDate + 'T00:00:00');
+        const endDate = parseLocalDate(s.endDate);
         const diffDays = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
 
-        if(diffDays >= 0 && diffDays <= 5) {
+        if(!isNaN(diffDays) && diffDays >= 0 && diffDays <= 5) {
           const u = window.db.users.find(x => x.id === s.userId);
           const p = window.db.platforms.find(x => x.id === s.platformId);
           const notifId = `expire_${s.id}`;
