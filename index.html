@@ -59,7 +59,7 @@
 
     <!-- Área Principal -->
     <main class="flex-1 flex flex-col min-w-0 overflow-y-auto bg-slate-900">
-      <header id="mainHeader" class="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-20 px-4 py-3 flex items-center justify-between hidden">
+      <header id="mainHeader" class="bg-slate-950/85 backdrop-blur-md border-b border-slate-800 sticky top-0 z-20 px-4 py-3 flex items-center justify-between hidden">
         <div class="flex items-center gap-3">
           <button onclick="toggleSidebar()" class="md:hidden text-slate-400 hover:text-white p-2">
             <i class="fa-solid fa-bars text-xl"></i>
@@ -189,7 +189,7 @@
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
               <h3 id="userFormTitle" class="text-base font-semibold text-white flex items-center gap-2">
-                <i class="fa-solid fa-user-plus text-cyan-400"></i> Registrar Usuario / Cliente
+                <i class="fa-solid fa-user-plus text-cyan-400"></i> Registrar / Editar Usuario
               </h3>
               <form id="userForm" onsubmit="handleUserSubmit(event)" class="space-y-4">
                 <input type="hidden" id="userId">
@@ -214,8 +214,9 @@
                     <label class="block text-xs font-medium text-slate-300 mb-1">Rol</label>
                     <select id="userRole" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
                       <option value="cliente">Cliente Final</option>
-                      <option value="vendedor" id="optRoleVendedor">Vendedor / Revendedor</option>
-                      <option value="admin" id="optRoleAdmin">World Entretenimiento Super Admin</option>
+                      <option value="vendedor">Vendedor / Revendedor</option>
+                      <option value="vendedor_pro">Vendedor Pro</option>
+                      <option value="admin">World Entretenimiento Super Admin</option>
                     </select>
                   </div>
                   <div>
@@ -296,7 +297,7 @@
         <!-- 5. BOOTS / BOTS STREAMING -->
         <section id="botsView" class="view-section hidden space-y-6">
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div id="botRegisterBox" class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+            <div id="botRegisterBox" class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4 hidden">
               <h3 class="text-base font-semibold text-white flex items-center gap-2">
                 <i class="fa-solid fa-robot text-cyan-400"></i> Registro de Boot
               </h3>
@@ -317,7 +318,7 @@
               </form>
             </div>
 
-            <div id="botDisplayBox" class="lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6">
+            <div id="botDisplayBox" class="lg:col-span-3 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6">
               <div>
                 <h3 class="text-base font-semibold text-white mb-2 flex items-center gap-2">
                   <i class="fa-solid fa-satellite-dish text-cyan-400"></i> Centro de Operación de Boots
@@ -352,16 +353,15 @@
                   <input type="text" id="platformCategory" placeholder="Ej: Video" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
                 </div>
                 <div>
-                  <label class="block text-xs font-medium text-slate-300 mb-1">Logotipo de la Plataforma</label>
-                  <div class="flex items-center gap-3 mb-2">
-                    <div id="platformLogoPreviewBox" class="w-12 h-12 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden">
+                  <label class="block text-xs font-medium text-slate-300 mb-1">Logotipo de la Plataforma (Desde Archivo)</label>
+                  <div class="flex items-center gap-3">
+                    <div id="platformLogoPreviewBox" class="w-12 h-12 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0">
                       <i class="fa-solid fa-tv text-slate-500"></i>
                     </div>
                     <div class="flex-1 space-y-1">
-                      <input type="file" id="platformLogoFile" accept="image/*" onchange="handlePlatformLogoFile(event)" class="block w-full text-[10px] text-slate-400">
+                      <input type="file" id="platformLogoFile" accept="image/*" onchange="handlePlatformLogoFile(event)" class="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-600 file:text-white hover:file:bg-cyan-500 cursor-pointer">
                     </div>
                   </div>
-                  <input type="text" id="platformLogoUrlInput" placeholder="O pega la URL de la imagen..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white">
                 </div>
                 <div class="pt-2 flex gap-2">
                   <button type="submit" id="btnSavePlatform" class="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white font-medium py-2 rounded-lg text-sm transition">Guardar Plataforma</button>
@@ -624,7 +624,7 @@
               <select id="filterReminderState" onchange="renderReminders()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white">
                 <option value="all">Todas las cuentas</option>
                 <option value="expiring" selected>Por vencer (&lt; 5 días)</option>
-                <option value="expired">Ya Vencidas</option>
+                <option value="expired">Ya Vencidas (&lt;= 0 días)</option>
               </select>
             </div>
 
@@ -653,7 +653,7 @@
               <h3 class="text-base font-semibold text-white flex items-center gap-2">
                 <i class="fa-solid fa-image text-cyan-400"></i> Logotipo Global del Sistema
               </h3>
-              <p class="text-xs text-slate-400">Sube una imagen o pega una URL para cambiar el logo del Login, Sidebar y Catálogo instantáneamente en todos los paneles.</p>
+              <p class="text-xs text-slate-400">Sube una imagen para cambiar el logo del Login, Sidebar y Catálogo instantáneamente en todos los paneles.</p>
               
               <div class="space-y-3">
                 <div class="flex items-center gap-4">
@@ -662,7 +662,6 @@
                   </div>
                   <div class="flex-1 space-y-2">
                     <input type="file" id="globalLogoFile" accept="image/*" onchange="handleGlobalLogoFile(event)" class="block w-full text-xs text-slate-400">
-                    <input type="text" id="globalLogoUrlInput" placeholder="O pega la URL de tu imagen aquí..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white">
                   </div>
                 </div>
                 <button onclick="saveGlobalLogo()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs py-2 rounded-lg font-medium transition">Actualizar Logotipo Global</button>
@@ -908,17 +907,14 @@
       return window.db.domains.some(d => d.name.toLowerCase() === domain);
     };
 
-    // Función auxiliar robusta para convertir fechas con guiones o diagonales a objetos Date válidos
     function parseLocalDate(dateStr) {
       if (!dateStr) return new Date(NaN);
-      // Si viene en formato DD/MM/YYYY (ej: 01/12/2026)
       if (dateStr.includes('/')) {
         const parts = dateStr.split('/');
         if (parts.length === 3) {
           return new Date(`${parts[2]}-${parts[1]}-${parts[0]}T00:00:00`);
         }
       }
-      // Formato estándar YYYY-MM-DD
       return new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
     }
 
@@ -1020,19 +1016,17 @@
         const reader = new FileReader();
         reader.onload = function(evt) {
           tempGlobalLogo = evt.target.result;
-          document.getElementById('platformLogoPreviewBox').innerHTML = `<img src="${tempGlobalLogo}" class="w-full h-full object-cover">`;
+          const previewBox = document.getElementById('globalLogoPreview');
+          if(previewBox) previewBox.innerHTML = `<img src="${tempGlobalLogo}" class="w-full h-full object-cover">`;
         };
         reader.readAsDataURL(file);
       }
     }
 
     window.saveGlobalLogo = async function() {
-      const urlInput = document.getElementById('globalLogoUrlInput').value.trim();
-      const finalLogo = tempGlobalLogo || urlInput;
-      if(!finalLogo) return alert('Por favor selecciona un archivo o ingresa una URL válida.');
-
-      window.db.globalLogo = finalLogo;
-      localStorage.setItem('st_global_logo', finalLogo);
+      if(!tempGlobalLogo) return alert('Por favor selecciona una imagen desde archivos.');
+      window.db.globalLogo = tempGlobalLogo;
+      localStorage.setItem('st_global_logo', tempGlobalLogo);
       await saveDB();
       window.applyGlobalLogo();
       alert('¡Logotipo global actualizado con éxito!');
@@ -1048,14 +1042,14 @@
       alert('¡Plantillas de WhatsApp guardadas con éxito!');
     }
 
-    // --- RENDERIZADO DE RECORDATORIOS Y CÁLCULO SEGURO DE FECHAS ---
+    // --- RENDERIZADO DE RECORDATORIOS Y FILTROS CORREGIDOS ---
     window.renderReminders = function() {
       const tbody = document.getElementById('remindersTableBody');
       const filterState = document.getElementById('filterReminderState')?.value || 'expiring';
       if(!tbody) return;
 
       const user = window.db.currentUser;
-      const isVendor = user && user.role === 'vendedor';
+      const isVendor = user && (user.role === 'vendedor' || user.role === 'vendedor_pro');
 
       let list = window.db.sales;
       if(isVendor) {
@@ -1081,7 +1075,7 @@
       let filtered = processedList.filter(item => {
         if (!item.isValidDate) return false;
         if(filterState === 'expiring') return item.diffDays >= 0 && item.diffDays <= 5;
-        if(filterState === 'expired') return item.diffDays < 0;
+        if(filterState === 'expired') return item.diffDays <= 0; // Incluye hoy (0 días) y vencidas (< 0 días)
         return true; // 'all'
       });
 
@@ -1243,14 +1237,30 @@
       alert('¡Cliente registrado con éxito!');
     }
 
+    // --- GESTIÓN DE LOGOTIPOS DESDE ARCHIVO LOCAL ---
+    let tempPlatformLogo = '';
+
+    window.handlePlatformLogoFile = function(e) {
+      const file = e.target.files[0];
+      if(file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          tempPlatformLogo = evt.target.result;
+          const preview = document.getElementById('platformLogoPreviewBox');
+          if(preview) preview.innerHTML = `<img src="${tempPlatformLogo}" class="w-full h-full object-cover">`;
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
     window.handlePlatformSubmit = async function(e) {
       e.preventDefault();
       const id = document.getElementById('platformId').value;
       const pName = document.getElementById('platformName').value.toUpperCase();
       const category = document.getElementById('platformCategory').value.trim();
-      const urlLogoInput = document.getElementById('platformLogoUrlInput').value.trim();
       const existingP = id ? window.db.platforms.find(p => p.id === id) : null;
-      const logo = tempPlatformLogo || urlLogoInput || (existingP ? existingP.logo : (window.db.globalLogo || DEFAULT_LOGO));
+      
+      const logo = tempPlatformLogo || (existingP ? existingP.logo : (window.db.globalLogo || DEFAULT_LOGO));
 
       if(id) {
         const idx = window.db.platforms.findIndex(p => p.id === id);
@@ -1264,7 +1274,7 @@
       renderPlatformsGrid();
       populateDropdowns();
       renderStats();
-      alert('¡Plataforma guardada!');
+      alert('¡Plataforma guardada con éxito!');
     }
 
     window.editPlatform = function(id) {
@@ -1273,7 +1283,6 @@
       document.getElementById('platformId').value = p.id;
       document.getElementById('platformName').value = p.name;
       document.getElementById('platformCategory').value = p.category || '';
-      document.getElementById('platformLogoUrlInput').value = p.logo.startsWith('data:') ? '' : p.logo;
       document.getElementById('platformLogoPreviewBox').innerHTML = `<img src="${p.logo}" class="w-full h-full object-cover">`;
       document.getElementById('platformFormHeaderTitle').innerText = 'Editar Plataforma';
       document.getElementById('btnSavePlatform').innerText = 'Actualizar Plataforma';
@@ -1326,7 +1335,7 @@
       const tbody = document.getElementById('assignedAccountsTableBody');
       if(!tbody) return;
       const user = window.db.currentUser;
-      const isVendor = user && user.role === 'vendedor';
+      const isVendor = user && (user.role === 'vendedor' || user.role === 'vendedor_pro');
       
       let list = window.db.sales;
       if(isVendor) {
@@ -1353,7 +1362,7 @@
         return;
       }
 
-      const allVendors = window.db.users.filter(u => u.role === 'vendedor' || u.role === 'admin');
+      const allVendors = window.db.users.filter(u => u.role === 'vendedor' || u.role === 'vendedor_pro' || u.role === 'admin');
 
       tbody.innerHTML = list.map(s => {
         const u = window.db.users.find(x => x.id === s.userId);
@@ -1398,7 +1407,7 @@
       document.getElementById('editAccPass').value = sale.accountPass;
       const userSelect = document.getElementById('editAccUser');
       const currentUser = window.db.currentUser;
-      const isVendor = currentUser && currentUser.role === 'vendedor';
+      const isVendor = currentUser && (currentUser.role === 'vendedor' || currentUser.role === 'vendedor_pro');
       let targetUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === currentUser.id) : window.db.users;
       userSelect.innerHTML = targetUsers.map(u => `<option value="${u.id}" ${u.id === sale.userId ? 'selected' : ''}>${u.name}</option>`).join('');
       document.getElementById('modalEditAssignedAccount').classList.remove('hidden');
@@ -1466,7 +1475,7 @@
 
       let userNotifs = window.db.notifications.filter(n => {
         if(user.role === 'admin') return true;
-        if(user.role === 'vendedor') return n.targetRole === 'all' && (n.vendorId === user.id || !n.vendorId);
+        if(user.role === 'vendedor' || user.role === 'vendedor_pro') return n.targetRole === 'all' && (n.vendorId === user.id || !n.vendorId);
         return false;
       }).sort((a,b) => new Date(b.date) - new Date(a.date));
 
@@ -1533,7 +1542,7 @@
       const tbody = document.getElementById('supportTableBody');
       if(!tbody) return;
       const user = window.db.currentUser;
-      let list = user?.role === 'cliente' ? window.db.tickets.filter(t => t.userId === user.id) : (user?.role === 'vendedor' ? window.db.tickets.filter(t => t.vendorId === user.id || !t.vendorId) : window.db.tickets);
+      let list = user?.role === 'cliente' ? window.db.tickets.filter(t => t.userId === user.id) : ((user?.role === 'vendedor' || user?.role === 'vendedor_pro') ? window.db.tickets.filter(t => t.vendorId === user.id || !t.vendorId) : window.db.tickets);
 
       tbody.innerHTML = list.map(t => {
         const u = window.db.users.find(x => x.id === t.userId);
@@ -1697,15 +1706,15 @@
       const nav = document.getElementById('mainNav');
       const role = window.db.currentUser?.role || 'guest';
       const items = [
-        { id: 'dashboardView', label: 'Dashboard', icon: 'fa-chart-pie', roles: ['admin', 'vendedor'] },
-        { id: 'usersView', label: 'Gestión Usuarios', icon: 'fa-users', roles: ['admin', 'vendedor'] },
+        { id: 'dashboardView', label: 'Dashboard', icon: 'fa-chart-pie', roles: ['admin', 'vendedor', 'vendedor_pro'] },
+        { id: 'usersView', label: 'Gestión Usuarios', icon: 'fa-users', roles: ['admin', 'vendedor', 'vendedor_pro'] },
         { id: 'domainsView', label: 'Dominios Vendedores', icon: 'fa-globe', roles: ['admin'] },
-        { id: 'botsView', label: 'Boots / Bots', icon: 'fa-robot', roles: ['admin', 'vendedor'] },
+        { id: 'botsView', label: 'Boots / Bots', icon: 'fa-robot', roles: ['admin', 'vendedor', 'vendedor_pro'] },
         { id: 'platformsView', label: 'Plataformas', icon: 'fa-tv', roles: ['admin'] },
-        { id: 'salesView', label: 'Ventas & Asignación', icon: 'fa-cart-shopping', roles: ['admin', 'vendedor'] },
-        { id: 'assignedAccountsView', label: 'Cuentas Asignadas', icon: 'fa-address-book', roles: ['admin', 'vendedor'] },
-        { id: 'supportView', label: 'Soporte Técnico', icon: 'fa-headset', roles: ['admin', 'vendedor', 'cliente'] },
-        { id: 'remindersView', label: 'Recordatorios WA', icon: 'fa-brands fa-whatsapp', roles: ['admin', 'vendedor'] },
+        { id: 'salesView', label: 'Ventas & Asignación', icon: 'fa-cart-shopping', roles: ['admin', 'vendedor', 'vendedor_pro'] },
+        { id: 'assignedAccountsView', label: 'Cuentas Asignadas', icon: 'fa-address-book', roles: ['admin', 'vendedor', 'vendedor_pro'] },
+        { id: 'supportView', label: 'Soporte Técnico', icon: 'fa-headset', roles: ['admin', 'vendedor', 'vendedor_pro', 'cliente'] },
+        { id: 'remindersView', label: 'Recordatorios WA', icon: 'fa-brands fa-whatsapp', roles: ['admin', 'vendedor', 'vendedor_pro'] },
         { id: 'settingsView', label: 'Configuración & Logo', icon: 'fa-gear', roles: ['admin'] },
       ];
       nav.innerHTML = items.filter(i => i.roles.includes(role)).map(i => `
@@ -1723,7 +1732,24 @@
       document.querySelectorAll('.view-section').forEach(s => s.classList.add('hidden'));
       document.getElementById(viewId)?.classList.remove('hidden');
       if(viewId === 'domainsView') renderDomainsTable();
-      if(viewId === 'botsView') { populateBotDomainCheckboxes(); renderBotsDisplay(); }
+      if(viewId === 'botsView') {
+        populateBotDomainCheckboxes();
+        renderBotsDisplay();
+        // Modificación 1: Ocultar el formulario de registro de boots para roles que no sean Admin o Vendedor Pro
+        const registerBox = document.getElementById('botRegisterBox');
+        const displayBox = document.getElementById('botDisplayBox');
+        const user = window.db.currentUser;
+        const canRegisterBot = user && (user.role === 'admin' || user.role === 'vendedor_pro');
+        if(registerBox) {
+          if(canRegisterBot) {
+            registerBox.classList.remove('hidden');
+            if(displayBox) displayBox.className = "lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6";
+          } else {
+            registerBox.classList.add('hidden');
+            if(displayBox) displayBox.className = "lg:col-span-3 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6";
+          }
+        }
+      }
       if(viewId === 'supportView') { renderSupportTable(); populateDropdowns(); }
       if(viewId === 'assignedAccountsView') renderAssignedAccountsTable();
       if(viewId === 'salesView') renderSalesTable();
@@ -1750,7 +1776,7 @@
     }
 
     function renderStats() {
-      const isVendor = window.db.currentUser?.role === 'vendedor';
+      const isVendor = window.db.currentUser?.role === 'vendedor' || window.db.currentUser?.role === 'vendedor_pro';
       const mySales = isVendor ? window.db.sales.filter(s => s.vendorId === window.db.currentUser.id || !s.vendorId) : window.db.sales;
       const myTickets = isVendor ? window.db.tickets.filter(t => t.vendorId === window.db.currentUser.id || !t.vendorId) : window.db.tickets;
       const myUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === window.db.currentUser.id) : window.db.users.filter(u => u.role === 'cliente');
@@ -1767,7 +1793,7 @@
       const supportUserSelect = document.getElementById('supportUser');
       const csvTargetSelect = document.getElementById('csvTargetUserSelect');
       const currentUser = window.db.currentUser;
-      const isVendor = currentUser?.role === 'vendedor';
+      const isVendor = currentUser?.role === 'vendedor' || currentUser?.role === 'vendedor_pro';
       let availableUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === currentUser.id) : window.db.users.filter(u => u.role === 'cliente');
 
       if(uSelect && pSelect) {
@@ -1784,7 +1810,7 @@
         populateUserAccountsForSupport();
       }
       if(vendorSelect && !isVendor) {
-        const vendors = window.db.users.filter(u => u.role === 'vendedor' || u.role === 'admin');
+        const vendors = window.db.users.filter(u => u.role === 'vendedor' || u.role === 'vendedor_pro' || u.role === 'admin');
         vendorSelect.innerHTML = vendors.map(v => `<option value="${v.id}" ${v.id === currentUser?.id ? 'selected' : ''}>${v.name}</option>`).join('');
       }
     }
@@ -1808,7 +1834,7 @@
       if(!window.isDomainAuthorized(emailInput)) return alert('❌ Dominio no autorizado.');
       const months = parseInt(document.getElementById('saleMonths').value);
       const end = new Date(); end.setMonth(end.getMonth() + months);
-      const vendorId = (window.db.currentUser?.role === 'vendedor') ? window.db.currentUser.id : (document.getElementById('assignedVendorSelect')?.value || '1');
+      const vendorId = (window.db.currentUser?.role === 'vendedor' || window.db.currentUser?.role === 'vendedor_pro') ? window.db.currentUser.id : (document.getElementById('assignedVendorSelect')?.value || '1');
 
       if(editId) {
         const sale = window.db.sales.find(s => s.id === editId);
@@ -1853,7 +1879,7 @@
       const tbody = document.getElementById('salesTableBody');
       if(!tbody) return;
       const user = window.db.currentUser;
-      const isVendor = user?.role === 'vendedor';
+      const isVendor = user?.role === 'vendedor' || user?.role === 'vendedor_pro';
       let list = isVendor ? window.db.sales.filter(s => s.vendorId === user.id || !s.vendorId) : window.db.sales;
 
       tbody.innerHTML = list.map(s => {
@@ -1912,14 +1938,37 @@
       alert('¡Usuario guardado!');
     }
 
-    window.resetUserForm = function() { document.getElementById('userForm').reset(); document.getElementById('userId').value = ''; }
+    window.resetUserForm = function() {
+      document.getElementById('userForm').reset();
+      document.getElementById('userId').value = '';
+      document.getElementById('userFormTitle').innerHTML = `<i class="fa-solid fa-user-plus text-cyan-400"></i> Registrar / Editar Usuario`;
+      document.getElementById('btnSaveUser').innerText = 'Guardar Usuario';
+    }
+
+    // Modificación 3: Función para editar usuario desde el directorio
+    window.editUser = function(id) {
+      const u = window.db.users.find(x => x.id === id);
+      if(!u) return;
+      document.getElementById('userId').value = u.id;
+      document.getElementById('userName').value = u.name;
+      document.getElementById('userEmail').value = u.email;
+      document.getElementById('userPhone').value = u.phone || '';
+      document.getElementById('userPassword').value = u.pass || '';
+      document.getElementById('userRole').value = u.role || 'cliente';
+      document.getElementById('userStatus').value = u.status || 'activo';
+      document.getElementById('userFormTitle').innerHTML = `<i class="fa-solid fa-pen text-cyan-400"></i> Editar Usuario`;
+      document.getElementById('btnSaveUser').innerText = 'Actualizar Usuario';
+      // Desplazar la vista hacia el formulario en pantallas pequeñas o medianas
+      document.getElementById('userForm').scrollIntoView({ behavior: 'smooth' });
+    }
 
     function renderUsersTable() {
       const tbody = document.getElementById('usersTableBody');
       if(!tbody) return;
       const search = document.getElementById('searchUser')?.value.toLowerCase() || '';
-      const isVendor = window.db.currentUser?.role === 'vendedor';
-      let list = isVendor ? window.db.users.filter(u => u.createdBy === window.db.currentUser.id) : window.db.users;
+      const currentUser = window.db.currentUser;
+      const isVendor = currentUser?.role === 'vendedor' || currentUser?.role === 'vendedor_pro';
+      let list = isVendor ? window.db.users.filter(u => u.createdBy === currentUser.id) : window.db.users;
       list = list.filter(u => u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search));
 
       tbody.innerHTML = list.map(u => `
@@ -1927,7 +1976,10 @@
           <td class="px-4 py-3">${u.name}<br><span class="text-xs text-slate-400">${u.email}</span></td>
           <td class="px-4 py-3 text-xs text-emerald-400">+${u.phone || 'N/A'}</td>
           <td class="px-4 py-3 capitalize"><span class="px-2 py-0.5 rounded text-xs bg-slate-700">${u.role}</span></td>
-          <td class="px-4 py-3 text-right"><button onclick="deleteUser('${u.id}')" class="text-red-400"><i class="fa-solid fa-trash"></i></button></td>
+          <td class="px-4 py-3 text-right space-x-1">
+            <button onclick="editUser('${u.id}')" class="text-cyan-400 hover:text-cyan-300 text-xs p-1.5 bg-slate-700/60 rounded" title="Editar Usuario"><i class="fa-solid fa-pen"></i></button>
+            <button onclick="deleteUser('${u.id}')" class="text-red-400 hover:text-red-300 text-xs p-1.5 bg-slate-700/60 rounded" title="Eliminar Usuario"><i class="fa-solid fa-trash"></i></button>
+          </td>
         </tr>
       `).join('');
     }
