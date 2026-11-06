@@ -1042,7 +1042,6 @@
       alert('¡Plantillas de WhatsApp guardadas con éxito!');
     }
 
-    // --- RENDERIZADO DE RECORDATORIOS Y FILTROS CORREGIDOS ---
     window.renderReminders = function() {
       const tbody = document.getElementById('remindersTableBody');
       const filterState = document.getElementById('filterReminderState')?.value || 'expiring';
@@ -1075,8 +1074,8 @@
       let filtered = processedList.filter(item => {
         if (!item.isValidDate) return false;
         if(filterState === 'expiring') return item.diffDays >= 0 && item.diffDays <= 5;
-        if(filterState === 'expired') return item.diffDays <= 0; // Incluye hoy (0 días) y vencidas (< 0 días)
-        return true; // 'all'
+        if(filterState === 'expired') return item.diffDays <= 0;
+        return true;
       });
 
       if(filtered.length === 0) {
@@ -1167,7 +1166,6 @@
       window.open(`https://wa.me/${phone}?text=${encoded}`, '_blank');
     }
 
-    // --- PORTAL DE CLIENTE ---
     function renderClientPortal(user) {
       const nameEl = document.getElementById('clientPortalName');
       const gridEl = document.getElementById('clientSubscriptionsGrid');
@@ -1205,7 +1203,6 @@
       }
     }
 
-    // --- MODALES Y ACCESOS ---
     window.openQuickClientModal = function() { document.getElementById('modalQuickClient').classList.remove('hidden'); }
     window.closeQuickClientModal = function() { document.getElementById('modalQuickClient').classList.add('hidden'); }
 
@@ -1237,7 +1234,6 @@
       alert('¡Cliente registrado con éxito!');
     }
 
-    // --- GESTIÓN DE LOGOTIPOS DESDE ARCHIVO LOCAL ---
     let tempPlatformLogo = '';
 
     window.handlePlatformLogoFile = function(e) {
@@ -1736,7 +1732,7 @@
         populateBotDomainCheckboxes();
         renderBotsDisplay();
         
-        // Control de visibilidad correcto: Solo Admin o Vendedor Pro ven el registro de bots
+        // Control riguroso de visibilidad: Oculta el registro si es vendedor regular
         const registerBox = document.getElementById('botRegisterBox');
         const displayBox = document.getElementById('botDisplayBox');
         const user = window.db.currentUser;
