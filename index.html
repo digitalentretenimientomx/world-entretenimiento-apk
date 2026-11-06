@@ -1599,9 +1599,7 @@
         return;
       }
 
-      // CORRECCIÓN ESTRICTA: Forzar roles según credenciales conocidas si fuera necesario
       if(emailInput === 'admin@stream.com') user.role = 'admin';
-      if(emailInput.includes('vendedor_pro') || user.name.toLowerCase().includes('pro')) user.role = 'vendedor_pro';
 
       window.db.currentUser = user;
       localStorage.setItem('st_cloud_current_user', JSON.stringify(user));
@@ -1728,17 +1726,19 @@
     function setupNav() {
       const nav = document.getElementById('mainNav');
       const role = window.db.currentUser?.role || 'guest';
+      
+      // Permitir a 'vendedor_pro' acceso equivalente a admin (excepto gestión de dominios globales si se desea, o completo según requerimiento)
       const items = [
         { id: 'dashboardView', label: 'Dashboard', icon: 'fa-chart-pie', roles: ['admin', 'vendedor', 'vendedor_pro'] },
         { id: 'usersView', label: 'Gestión Usuarios', icon: 'fa-users', roles: ['admin', 'vendedor', 'vendedor_pro'] },
-        { id: 'domainsView', label: 'Dominios Vendedores', icon: 'fa-globe', roles: ['admin'] },
+        { id: 'domainsView', label: 'Dominios Vendedores', icon: 'fa-globe', roles: ['admin', 'vendedor_pro'] },
         { id: 'botsView', label: 'Boots / Bots', icon: 'fa-robot', roles: ['admin', 'vendedor', 'vendedor_pro'] },
-        { id: 'platformsView', label: 'Plataformas', icon: 'fa-tv', roles: ['admin'] },
+        { id: 'platformsView', label: 'Plataformas', icon: 'fa-tv', roles: ['admin', 'vendedor_pro'] },
         { id: 'salesView', label: 'Ventas & Asignación', icon: 'fa-cart-shopping', roles: ['admin', 'vendedor', 'vendedor_pro'] },
         { id: 'assignedAccountsView', label: 'Cuentas Asignadas', icon: 'fa-address-book', roles: ['admin', 'vendedor', 'vendedor_pro'] },
         { id: 'supportView', label: 'Soporte Técnico', icon: 'fa-headset', roles: ['admin', 'vendedor', 'vendedor_pro', 'cliente'] },
         { id: 'remindersView', label: 'Recordatorios WA', icon: 'fa-brands fa-whatsapp', roles: ['admin', 'vendedor', 'vendedor_pro'] },
-        { id: 'settingsView', label: 'Configuración & Logo', icon: 'fa-gear', roles: ['admin'] },
+        { id: 'settingsView', label: 'Configuración & Logo', icon: 'fa-gear', roles: ['admin', 'vendedor_pro'] },
       ];
       nav.innerHTML = items.filter(i => i.roles.includes(role)).map(i => `
         <button onclick="switchView('${i.id}')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
@@ -1759,23 +1759,21 @@
         populateBotDomainCheckboxes();
         renderBotsDisplay();
         
-        // Control visual de la caja de registro según el rol actual
+        // Control visual estricto: Ocultar o mostrar caja de registro según si es admin o vendedor_pro
         const registerBox = document.getElementById('botRegisterBox');
         const displayBox = document.getElementById('botDisplayBox');
         const user = window.db.currentUser;
         const canRegisterBot = user && (user.role === 'admin' || user.role === 'vendedor_pro');
         
         if(registerBox) {
-          // Ocultar alerta previa al cambiar de vista
           document.getElementById('botPermissionAlert')?.classList.add('hidden');
-          
           if(canRegisterBot) {
             registerBox.classList.remove('hidden');
             if(displayBox) displayBox.className = "lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6";
           } else {
-            // Permitir ver la sección de registro pero bloqueada o mostrar el formulario con la restricción activa
-            registerBox.classList.remove('hidden');
-            if(displayBox) displayBox.className = "lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6";
+            // Ocultar por completo la caja de registro para vendedores regulares
+            registerBox.classList.add('hidden');
+            if(displayBox) displayBox.className = "lg:col-span-3 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6";
           }
         }
       }
@@ -1823,7 +1821,7 @@
       const csvTargetSelect = document.getElementById('csvTargetUserSelect');
       const currentUser = window.db.currentUser;
       const isVendor = currentUser?.role === 'vendedor' || currentUser?.role === 'vendedor_pro';
-      let availableUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === currentUser.id) : window.db.users.filter(u => u.role === 'cliente');
+      let availableUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === currentUser.id) : window.db.users;
 
       if(uSelect && pSelect) {
         uSelect.innerHTML = availableUsers.map(u => `<option value="${u.id}">${u.name} (${u.phone || 'Sin tel'})</option>`).join('');
@@ -1948,15 +1946,25 @@
       e.preventDefault();
       const id = document.getElementById('userId').value;
       const email = document.getElementById('userEmail').value.trim().toLowerCase();
+      const roleSelected = document.getElementById('userRole').value;
+      const currentUser = window.db.currentUser;
+
+      // RESTRICCIÓN JERÁRQUICA: Un vendedor_pro no puede asignar un rol superior o igual al suyo (no puede crear admin)
+      if (currentUser && currentUser.role === 'vendedor_pro') {
+        if (roleSelected === 'admin') {
+          return alert('❌ No cuenta con la categoría para asignar el rol de Super Administrador.');
+        }
+      }
+
       if(!window.isDomainAuthorized(email)) return alert('❌ Dominio no autorizado.');
       const uData = {
         id: id || Date.now().toString(),
         name: document.getElementById('userName').value.trim(),
         email, phone: document.getElementById('userPhone').value.replace(/[^0-9]/g, ''),
         pass: document.getElementById('userPassword').value.trim(),
-        role: document.getElementById('userRole').value,
+        role: roleSelected,
         status: document.getElementById('userStatus').value,
-        createdBy: window.db.currentUser?.id || '1'
+        createdBy: currentUser?.id || '1'
       };
       if(id) { const idx = window.db.users.findIndex(u => u.id === id); if(idx !== -1) window.db.users[idx] = uData; }
       else window.db.users.push(uData);
@@ -1995,6 +2003,16 @@
       const search = document.getElementById('searchUser')?.value.toLowerCase() || '';
       const currentUser = window.db.currentUser;
       const isVendor = currentUser?.role === 'vendedor' || currentUser?.role === 'vendedor_pro';
+      
+      // Filtrar opciones del select de rol según el nivel del usuario actual
+      const roleSelect = document.getElementById('userRole');
+      if (roleSelect && currentUser?.role === 'vendedor_pro') {
+        Array.from(roleSelect.options).forEach(opt => {
+          if (opt.value === 'admin') opt.disabled = true;
+          else opt.disabled = false;
+        });
+      }
+
       let list = isVendor ? window.db.users.filter(u => u.createdBy === currentUser.id) : window.db.users;
       list = list.filter(u => u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search));
 
