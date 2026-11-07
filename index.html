@@ -655,12 +655,12 @@
         <section id="settingsView" class="view-section hidden space-y-6">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            <!-- CONFIGURAR LOGOTIPO GLOBAL -->
+            <!-- CONFIGURAR LOGOTIPO -->
             <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
               <h3 class="text-base font-semibold text-white flex items-center gap-2">
-                <i class="fa-solid fa-image text-cyan-400"></i> Logotipo Global del Sistema
+                <i class="fa-solid fa-image text-cyan-400"></i> <span id="logoSectionTitle">Logotipo del Sistema</span>
               </h3>
-              <p class="text-xs text-slate-400">Sube una imagen para cambiar el logo del Login, Sidebar y Catálogo instantáneamente en todos los paneles.</p>
+              <p id="logoSectionDesc" class="text-xs text-slate-400">Sube una imagen para cambiar el logotipo de tu panel.</p>
               
               <div class="space-y-3">
                 <div class="flex items-center gap-4">
@@ -671,12 +671,12 @@
                     <input type="file" id="globalLogoFile" accept="image/*" onchange="handleGlobalLogoFile(event)" class="block w-full text-xs text-slate-400">
                   </div>
                 </div>
-                <button onclick="saveGlobalLogo()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs py-2 rounded-lg font-medium transition">Actualizar Logotipo Global</button>
+                <button onclick="saveCustomLogoByRole()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs py-2 rounded-lg font-medium transition">Guardar Logotipo</button>
               </div>
             </div>
 
             <!-- EDITOR DE PLANTILLAS DE WHATSAPP -->
-            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+            <div id="templatesEditorCard" class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
               <h3 class="text-base font-semibold text-white flex items-center gap-2">
                 <i class="fa-solid fa-sliders text-cyan-400"></i> Editor de Plantillas de WhatsApp
               </h3>
@@ -1006,7 +1006,15 @@
     setInterval(backgroundSync, 10000);
 
     window.applyGlobalLogo = function() {
-      const activeLogo = window.db.globalLogo || localStorage.getItem('st_global_logo') || DEFAULT_LOGO;
+      const user = window.db.currentUser;
+      let activeLogo = window.db.globalLogo || DEFAULT_LOGO;
+
+      if (user && user.role === 'vendedor_pro' && user.customLogo) {
+        activeLogo = user.customLogo;
+      } else if (!user) {
+        activeLogo = window.db.globalLogo || localStorage.getItem('st_global_logo') || DEFAULT_LOGO;
+      }
+
       const loginImg = document.getElementById('loginLogoImg');
       const sidebarImg = document.getElementById('sidebarLogoImg');
       const previewBox = document.getElementById('globalLogoPreview');
@@ -1030,13 +1038,32 @@
       }
     }
 
-    window.saveGlobalLogo = async function() {
+    window.saveCustomLogoByRole = async function() {
       if(!tempGlobalLogo) return alert('Por favor selecciona una imagen desde archivos.');
-      window.db.globalLogo = tempGlobalLogo;
-      localStorage.setItem('st_global_logo', tempGlobalLogo);
-      await saveDB();
-      window.applyGlobalLogo();
-      alert('¡Logotipo global actualizado con éxito!');
+      const user = window.db.currentUser;
+      if (!user) return;
+
+      if (user.role === 'admin') {
+        window.db.globalLogo = tempGlobalLogo;
+        localStorage.setItem('st_global_logo', tempGlobalLogo);
+        await saveDB();
+        window.applyGlobalLogo();
+        alert('¡Logotipo global del sistema actualizado con éxito!');
+      } else if (user.role === 'vendedor_pro') {
+        user.customLogo = tempGlobalLogo;
+        await saveDB();
+        applyVendorProLogo(tempGlobalLogo);
+        alert('¡Logotipo de tu panel Pro actualizado con éxito!');
+      } else {
+        alert('No cuenta con la categoría para realizar esta acción.');
+      }
+    }
+
+    function applyVendorProLogo(logoUrl) {
+      const sidebarImg = document.getElementById('sidebarLogoImg');
+      const previewBox = document.getElementById('globalLogoPreview');
+      if(sidebarImg) sidebarImg.src = logoUrl;
+      if(previewBox) previewBox.innerHTML = `<img src="${logoUrl}" class="w-full h-full object-cover">`;
     }
 
     window.saveTemplates = async function() {
@@ -1662,7 +1689,6 @@
       const alertBox = document.getElementById('botPermissionAlert');
       const alertText = document.getElementById('botPermissionAlertText');
 
-      // Validar estrictamente si tiene categoría permitida (admin o vendedor_pro)
       if (!user || (user.role !== 'admin' && user.role !== 'vendedor_pro')) {
         if (alertBox && alertText) {
           alertText.innerText = "No cuenta con la categoría para realizar esta acción";
@@ -1727,7 +1753,6 @@
       const nav = document.getElementById('mainNav');
       const role = window.db.currentUser?.role || 'guest';
       
-      // Permitir a 'vendedor_pro' acceso equivalente a admin (excepto gestión de dominios globales si se desea, o completo según requerimiento)
       const items = [
         { id: 'dashboardView', label: 'Dashboard', icon: 'fa-chart-pie', roles: ['admin', 'vendedor', 'vendedor_pro'] },
         { id: 'usersView', label: 'Gestión Usuarios', icon: 'fa-users', roles: ['admin', 'vendedor', 'vendedor_pro'] },
@@ -1759,7 +1784,6 @@
         populateBotDomainCheckboxes();
         renderBotsDisplay();
         
-        // Control visual estricto: Ocultar o mostrar caja de registro según si es admin o vendedor_pro
         const registerBox = document.getElementById('botRegisterBox');
         const displayBox = document.getElementById('botDisplayBox');
         const user = window.db.currentUser;
@@ -1771,10 +1795,24 @@
             registerBox.classList.remove('hidden');
             if(displayBox) displayBox.className = "lg:col-span-2 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6";
           } else {
-            // Ocultar por completo la caja de registro para vendedores regulares
             registerBox.classList.add('hidden');
             if(displayBox) displayBox.className = "lg:col-span-3 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6";
           }
+        }
+      }
+      if(viewId === 'settingsView') {
+        const user = window.db.currentUser;
+        const titleEl = document.getElementById('logoSectionTitle');
+        const descEl = document.getElementById('logoSectionDesc');
+        const tplEditor = document.getElementById('templatesEditorCard');
+        if(user && user.role === 'vendedor_pro') {
+          if(titleEl) titleEl.innerText = "Logotipo Personalizado de tu Panel";
+          if(descEl) descEl.innerText = "Sube una imagen para cambiar el logotipo exclusivamente en tu panel de vendedor pro.";
+          if(tplEditor) tplEditor.classList.remove('hidden');
+        } else if(user && user.role === 'admin') {
+          if(titleEl) titleEl.innerText = "Logotipo Global del Sistema";
+          if(descEl) descEl.innerText = "Sube una imagen para cambiar el logo del Login, Sidebar y Catálogo instantáneamente en todos los paneles.";
+          if(tplEditor) tplEditor.classList.remove('hidden');
         }
       }
       if(viewId === 'supportView') { renderSupportTable(); populateDropdowns(); }
@@ -1949,7 +1987,6 @@
       const roleSelected = document.getElementById('userRole').value;
       const currentUser = window.db.currentUser;
 
-      // RESTRICCIÓN JERÁRQUICA: Un vendedor_pro no puede asignar un rol superior o igual al suyo (no puede crear admin)
       if (currentUser && currentUser.role === 'vendedor_pro') {
         if (roleSelected === 'admin') {
           return alert('❌ No cuenta con la categoría para asignar el rol de Super Administrador.');
@@ -2004,7 +2041,6 @@
       const currentUser = window.db.currentUser;
       const isVendor = currentUser?.role === 'vendedor' || currentUser?.role === 'vendedor_pro';
       
-      // Filtrar opciones del select de rol según el nivel del usuario actual
       const roleSelect = document.getElementById('userRole');
       if (roleSelect && currentUser?.role === 'vendedor_pro') {
         Array.from(roleSelect.options).forEach(opt => {
