@@ -1866,7 +1866,7 @@
         uSelect.innerHTML = availableUsers.map(u => `<option value="${u.id}">${u.name} (${u.phone || 'Sin tel'})</option>`).join('');
         pSelect.innerHTML = window.db.platforms.filter(p => p.active).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
         updateSaleContactInfo();
-        onPlatformChange(); // Actualizar el desplegable de correos según la plataforma inicial
+        onPlatformChange();
       }
       if(csvTargetSelect) {
         let csvUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && (u.createdBy === currentUser.id || !u.createdBy)) : window.db.users;
@@ -1887,7 +1887,6 @@
       const datalist = document.getElementById('platformEmailsList');
       if(!platformId || !datalist) return;
 
-      // Filtrar correos únicos ya registrados en las ventas para esta plataforma
       const platformSales = window.db.sales.filter(s => s.platformId === platformId);
       const uniqueEmails = [...new Set(platformSales.map(s => s.accountEmail))];
 
@@ -1914,37 +1913,76 @@
       const months = parseInt(document.getElementById('saleMonths').value);
       const end = new Date(); end.setMonth(end.getMonth() + months);
       const vendorId = (window.db.currentUser?.role === 'vendedor' || window.db.currentUser?.role === 'vendedor_pro') ? window.db.currentUser.id : (document.getElementById('assignedVendorSelect')?.value || '1');
+      const userId = document.getElementById('saleUser').value;
+      const phone = document.getElementById('salePhone').value.replace(/[^0-9]/g, '');
+      const platformId = document.getElementById('salePlatform').value;
+      const type = document.getElementById('saleType').value;
+      const accountPass = document.getElementById('saleAccountPass').value;
+      const profileName = document.getElementById('saleProfileName')?.value || '';
+      const profilePin = document.getElementById('saleProfilePin')?.value || '';
+      const endDateStr = end.toISOString().split('T')[0];
+
+      let savedSaleId = editId;
 
       if(editId) {
         const sale = window.db.sales.find(s => s.id === editId);
         if(sale) {
-          sale.userId = document.getElementById('saleUser').value;
+          sale.userId = userId;
           sale.vendorId = vendorId;
-          sale.phone = document.getElementById('salePhone').value.replace(/[^0-9]/g, '');
-          sale.platformId = document.getElementById('salePlatform').value;
-          sale.type = document.getElementById('saleType').value;
+          sale.phone = phone;
+          sale.platformId = platformId;
+          sale.type = type;
           sale.accountEmail = emailInput;
-          sale.accountPass = document.getElementById('saleAccountPass').value;
-          sale.endDate = end.toISOString().split('T')[0];
+          sale.accountPass = accountPass;
+          sale.endDate = endDateStr;
+          sale.profileName = profileName;
+          sale.profilePin = profilePin;
         }
       } else {
+        savedSaleId = Date.now().toString();
         window.db.sales.push({
-          id: Date.now().toString(),
-          userId: document.getElementById('saleUser').value,
+          id: savedSaleId,
+          userId: userId,
           vendorId: vendorId,
-          phone: document.getElementById('salePhone').value.replace(/[^0-9]/g, ''),
-          platformId: document.getElementById('salePlatform').value,
-          type: document.getElementById('saleType').value,
+          phone: phone,
+          platformId: platformId,
+          type: type,
           accountEmail: emailInput,
-          accountPass: document.getElementById('saleAccountPass').value,
+          accountPass: accountPass,
+          profileName: profileName,
+          profilePin: profilePin,
           startDate: new Date().toISOString().split('T')[0],
-          endDate: end.toISOString().split('T')[0]
+          endDate: endDateStr
         });
       }
       await saveDB();
+
+      // Disparar envío por WhatsApp automático al cliente con la plantilla de cuenta nueva
+      const u = window.db.users.find(x => x.id === userId);
+      const p = window.db.platforms.find(x => x.id === platformId);
+      const clientPhone = phone || (u ? u.phone : '');
+
+      if (clientPhone) {
+        let template = window.db.templates.new || "";
+        let message = template
+          .replace(/{cliente}/g, u ? u.name : 'Cliente')
+          .replace(/{plataforma}/g, p ? p.name : 'Plataforma')
+          .replace(/{correo}/g, emailInput)
+          .replace(/{password}/g, accountPass)
+          .replace(/{perfil}/g, profileName ? `${profileName} (PIN: ${profilePin || 'N/A'})` : 'FULL')
+          .replace(/{pin}/g, profilePin || 'FULL')
+          .replace(/{vencimiento}/g, endDateStr)
+          .replace(/{dias_restantes}/g, '30');
+
+        const encoded = encodeURIComponent(message);
+        window.open(`https://wa.me/${clientPhone}?text=${encoded}`, '_blank');
+      } else {
+        alert('⚠️ Venta guardada, pero el cliente no cuenta con número de WhatsApp registrado para el envío automático.');
+      }
+
       resetSaleForm();
       renderAll();
-      alert('¡Venta guardada!');
+      alert('¡Venta guardada y enviada por WhatsApp con éxito!');
     }
 
     window.resetSaleForm = function() {
@@ -1962,16 +2000,27 @@
       const isVendor = user?.role === 'vendedor' || user?.role === 'vendedor_pro';
       let list = isVendor ? window.db.sales.filter(s => s.vendorId === user.id || !s.vendorId) : window.db.sales;
 
+      if(list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="px-3 py-6 text-center text-xs text-slate-400">No hay suscripciones vendidas registradas.</td></tr>`;
+        return;
+      }
+
       tbody.innerHTML = list.map(s => {
         const u = window.db.users.find(x => x.id === s.userId);
         const p = window.db.platforms.find(x => x.id === s.platformId);
+        const clientName = u ? u.name : 'Cliente General';
+        const clientEmail = u ? u.email : s.accountEmail;
+
         return `
-          <tr class="border-b border-slate-800">
-            <td class="px-3 py-3">${u?.name || 'N/A'}<br><span class="text-xs text-slate-400">${s.accountEmail}</span></td>
-            <td class="px-3 py-3">${p?.name || 'N/A'}</td>
+          <tr class="border-b border-slate-800 hover:bg-slate-800/30">
+            <td class="px-3 py-3">
+              <div class="font-bold text-white">${clientName}</div>
+              <div class="text-xs text-slate-400">${clientEmail}</div>
+            </td>
+            <td class="px-3 py-3 font-semibold text-cyan-300">${p?.name || 'N/A'}</td>
             <td class="px-3 py-3 text-xs">${s.endDate}</td>
             <td class="px-3 py-3 text-right">
-              <button onclick="deleteSale('${s.id}')" class="text-red-400"><i class="fa-solid fa-trash"></i></button>
+              <button onclick="deleteSale('${s.id}')" class="text-red-400 hover:text-red-300 p-1.5 bg-slate-700/60 rounded" title="Eliminar Venta"><i class="fa-solid fa-trash"></i></button>
             </td>
           </tr>
         `;
