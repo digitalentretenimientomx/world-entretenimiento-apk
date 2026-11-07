@@ -655,12 +655,12 @@
         <section id="settingsView" class="view-section hidden space-y-6">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            <!-- CONFIGURAR LOGOTIPO -->
+            <!-- CONFIGURAR LOGOTIPO (SOLO ADMIN) -->
             <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
               <h3 class="text-base font-semibold text-white flex items-center gap-2">
-                <i class="fa-solid fa-image text-cyan-400"></i> <span id="logoSectionTitle">Logotipo del Sistema</span>
+                <i class="fa-solid fa-image text-cyan-400"></i> Logotipo Global del Sistema
               </h3>
-              <p id="logoSectionDesc" class="text-xs text-slate-400">Sube una imagen para cambiar el logotipo de tu panel.</p>
+              <p class="text-xs text-slate-400">Sube una imagen para cambiar el logo del Login, Sidebar y Catálogo en todo el sistema.</p>
               
               <div class="space-y-3">
                 <div class="flex items-center gap-4">
@@ -671,12 +671,12 @@
                     <input type="file" id="globalLogoFile" accept="image/*" onchange="handleGlobalLogoFile(event)" class="block w-full text-xs text-slate-400">
                   </div>
                 </div>
-                <button onclick="saveCustomLogoByRole()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs py-2 rounded-lg font-medium transition">Guardar Logotipo</button>
+                <button onclick="saveGlobalLogo()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs py-2 rounded-lg font-medium transition">Actualizar Logotipo Global</button>
               </div>
             </div>
 
             <!-- EDITOR DE PLANTILLAS DE WHATSAPP -->
-            <div id="templatesEditorCard" class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-4">
               <h3 class="text-base font-semibold text-white flex items-center gap-2">
                 <i class="fa-solid fa-sliders text-cyan-400"></i> Editor de Plantillas de WhatsApp
               </h3>
@@ -1006,15 +1006,7 @@
     setInterval(backgroundSync, 10000);
 
     window.applyGlobalLogo = function() {
-      const user = window.db.currentUser;
-      let activeLogo = window.db.globalLogo || DEFAULT_LOGO;
-
-      if (user && user.role === 'vendedor_pro' && user.customLogo) {
-        activeLogo = user.customLogo;
-      } else if (!user) {
-        activeLogo = window.db.globalLogo || localStorage.getItem('st_global_logo') || DEFAULT_LOGO;
-      }
-
+      const activeLogo = window.db.globalLogo || localStorage.getItem('st_global_logo') || DEFAULT_LOGO;
       const loginImg = document.getElementById('loginLogoImg');
       const sidebarImg = document.getElementById('sidebarLogoImg');
       const previewBox = document.getElementById('globalLogoPreview');
@@ -1038,32 +1030,17 @@
       }
     }
 
-    window.saveCustomLogoByRole = async function() {
-      if(!tempGlobalLogo) return alert('Por favor selecciona una imagen desde archivos.');
+    window.saveGlobalLogo = async function() {
       const user = window.db.currentUser;
-      if (!user) return;
-
-      if (user.role === 'admin') {
-        window.db.globalLogo = tempGlobalLogo;
-        localStorage.setItem('st_global_logo', tempGlobalLogo);
-        await saveDB();
-        window.applyGlobalLogo();
-        alert('¡Logotipo global del sistema actualizado con éxito!');
-      } else if (user.role === 'vendedor_pro') {
-        user.customLogo = tempGlobalLogo;
-        await saveDB();
-        applyVendorProLogo(tempGlobalLogo);
-        alert('¡Logotipo de tu panel Pro actualizado con éxito!');
-      } else {
-        alert('No cuenta con la categoría para realizar esta acción.');
+      if (!user || user.role !== 'admin') {
+        return alert('❌ Solo el Super Administrador puede cambiar el logotipo global del sistema.');
       }
-    }
-
-    function applyVendorProLogo(logoUrl) {
-      const sidebarImg = document.getElementById('sidebarLogoImg');
-      const previewBox = document.getElementById('globalLogoPreview');
-      if(sidebarImg) sidebarImg.src = logoUrl;
-      if(previewBox) previewBox.innerHTML = `<img src="${logoUrl}" class="w-full h-full object-cover">`;
+      if(!tempGlobalLogo) return alert('Por favor selecciona una imagen desde archivos.');
+      window.db.globalLogo = tempGlobalLogo;
+      localStorage.setItem('st_global_logo', tempGlobalLogo);
+      await saveDB();
+      window.applyGlobalLogo();
+      alert('¡Logotipo global actualizado con éxito!');
     }
 
     window.saveTemplates = async function() {
@@ -1763,7 +1740,8 @@
         { id: 'assignedAccountsView', label: 'Cuentas Asignadas', icon: 'fa-address-book', roles: ['admin', 'vendedor', 'vendedor_pro'] },
         { id: 'supportView', label: 'Soporte Técnico', icon: 'fa-headset', roles: ['admin', 'vendedor', 'vendedor_pro', 'cliente'] },
         { id: 'remindersView', label: 'Recordatorios WA', icon: 'fa-brands fa-whatsapp', roles: ['admin', 'vendedor', 'vendedor_pro'] },
-        { id: 'settingsView', label: 'Configuración & Logo', icon: 'fa-gear', roles: ['admin', 'vendedor_pro'] },
+        // Configuración solo disponible para el Super Admin
+        { id: 'settingsView', label: 'Configuración & Logo', icon: 'fa-gear', roles: ['admin'] },
       ];
       nav.innerHTML = items.filter(i => i.roles.includes(role)).map(i => `
         <button onclick="switchView('${i.id}')" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition">
@@ -1798,21 +1776,6 @@
             registerBox.classList.add('hidden');
             if(displayBox) displayBox.className = "lg:col-span-3 bg-slate-800/60 border border-slate-700/60 rounded-xl p-5 space-y-6";
           }
-        }
-      }
-      if(viewId === 'settingsView') {
-        const user = window.db.currentUser;
-        const titleEl = document.getElementById('logoSectionTitle');
-        const descEl = document.getElementById('logoSectionDesc');
-        const tplEditor = document.getElementById('templatesEditorCard');
-        if(user && user.role === 'vendedor_pro') {
-          if(titleEl) titleEl.innerText = "Logotipo Personalizado de tu Panel";
-          if(descEl) descEl.innerText = "Sube una imagen para cambiar el logotipo exclusivamente en tu panel de vendedor pro.";
-          if(tplEditor) tplEditor.classList.remove('hidden');
-        } else if(user && user.role === 'admin') {
-          if(titleEl) titleEl.innerText = "Logotipo Global del Sistema";
-          if(descEl) descEl.innerText = "Sube una imagen para cambiar el logo del Login, Sidebar y Catálogo instantáneamente en todos los paneles.";
-          if(tplEditor) tplEditor.classList.remove('hidden');
         }
       }
       if(viewId === 'supportView') { renderSupportTable(); populateDropdowns(); }
