@@ -413,7 +413,7 @@
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-slate-300 mb-1">Plataforma Streaming</label>
-                  <select id="salePlatform" required class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"></select>
+                  <select id="salePlatform" required onchange="onPlatformChange()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"></select>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                   <div>
@@ -438,7 +438,8 @@
                 <div class="grid grid-cols-2 gap-3">
                   <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Correo Cuenta (Dominio Autorizado)</label>
-                    <input type="text" id="saleAccountEmail" required placeholder="cuenta@stream.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                    <input type="text" id="saleAccountEmail" list="platformEmailsList" required placeholder="cuenta@stream.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                    <datalist id="platformEmailsList"></datalist>
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Clave Cuenta</label>
@@ -1817,7 +1818,7 @@
       }
       if(viewId === 'supportView') { renderSupportTable(); populateDropdowns(); }
       if(viewId === 'assignedAccountsView') renderAssignedAccountsTable();
-      if(viewId === 'salesView') renderSalesTable();
+      if(viewId === 'salesView') { renderSalesTable(); populateDropdowns(); }
       if(viewId === 'remindersView') renderReminders();
       if(viewId === 'clientPortalView' && window.db.currentUser) renderClientPortal(window.db.currentUser);
     }
@@ -1865,6 +1866,7 @@
         uSelect.innerHTML = availableUsers.map(u => `<option value="${u.id}">${u.name} (${u.phone || 'Sin tel'})</option>`).join('');
         pSelect.innerHTML = window.db.platforms.filter(p => p.active).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
         updateSaleContactInfo();
+        onPlatformChange(); // Actualizar el desplegable de correos según la plataforma inicial
       }
       if(csvTargetSelect) {
         let csvUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && (u.createdBy === currentUser.id || !u.createdBy)) : window.db.users;
@@ -1878,6 +1880,18 @@
         const vendors = window.db.users.filter(u => u.role === 'vendedor' || u.role === 'vendedor_pro' || u.role === 'admin');
         vendorSelect.innerHTML = vendors.map(v => `<option value="${v.id}" ${v.id === currentUser?.id ? 'selected' : ''}>${v.name}</option>`).join('');
       }
+    }
+
+    window.onPlatformChange = function() {
+      const platformId = document.getElementById('salePlatform')?.value;
+      const datalist = document.getElementById('platformEmailsList');
+      if(!platformId || !datalist) return;
+
+      // Filtrar correos únicos ya registrados en las ventas para esta plataforma
+      const platformSales = window.db.sales.filter(s => s.platformId === platformId);
+      const uniqueEmails = [...new Set(platformSales.map(s => s.accountEmail))];
+
+      datalist.innerHTML = uniqueEmails.map(email => `<option value="${email}">`).join('');
     }
 
     window.updateSaleContactInfo = function() {
@@ -1938,6 +1952,7 @@
       document.getElementById('editSaleId').value = '';
       updateSaleContactInfo();
       toggleProfileFields();
+      onPlatformChange();
     }
 
     function renderSalesTable() {
