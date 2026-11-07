@@ -425,7 +425,7 @@
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Vigencia (Meses)</label>
-                    <select id="saleMonths" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                    <select id="saleMonths" onchange="updateDefaultEndDate()" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
                       <option value="1">1 Mes</option>
                       <option value="2">2 Meses</option>
                       <option value="3">3 Meses</option>
@@ -433,6 +433,13 @@
                       <option value="12">12 Meses</option>
                     </select>
                   </div>
+                </div>
+
+                <!-- CAMPO DE FECHA DE VENCIMIENTO PERSONALIZABLE -->
+                <div>
+                  <label class="block text-xs font-medium text-cyan-400 mb-1"><i class="fa-solid fa-calendar-days"></i> Fecha Exacta de Vencimiento</label>
+                  <input type="date" id="saleCustomEndDate" required class="w-full bg-slate-900 border border-cyan-500/40 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                  <p class="text-[10px] text-slate-400 mt-0.5">Calculada automáticamente según los meses, pero puedes modificarla para ajustarla al día real de venta.</p>
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -1818,7 +1825,7 @@
       }
       if(viewId === 'supportView') { renderSupportTable(); populateDropdowns(); }
       if(viewId === 'assignedAccountsView') renderAssignedAccountsTable();
-      if(viewId === 'salesView') { renderSalesTable(); populateDropdowns(); }
+      if(viewId === 'salesView') { renderSalesTable(); populateDropdowns(); updateDefaultEndDate(); }
       if(viewId === 'remindersView') renderReminders();
       if(viewId === 'clientPortalView' && window.db.currentUser) renderClientPortal(window.db.currentUser);
     }
@@ -1900,6 +1907,17 @@
       if(u && phoneInput) phoneInput.value = u.phone || '';
     }
 
+    window.updateDefaultEndDate = function() {
+      const monthsSelect = document.getElementById('saleMonths');
+      const endDateInput = document.getElementById('saleCustomEndDate');
+      if(!monthsSelect || !endDateInput) return;
+
+      const months = parseInt(monthsSelect.value) || 1;
+      const d = new Date();
+      d.setMonth(d.getMonth() + months);
+      endDateInput.value = d.toISOString().split('T')[0];
+    }
+
     window.toggleProfileFields = function() {
       const type = document.getElementById('saleType')?.value;
       document.getElementById('profileFields')?.classList.toggle('hidden', type !== 'perfil');
@@ -1910,8 +1928,10 @@
       const editId = document.getElementById('editSaleId').value;
       const emailInput = document.getElementById('saleAccountEmail').value.trim().toLowerCase();
       if(!window.isDomainAuthorized(emailInput)) return alert('❌ Dominio no autorizado.');
-      const months = parseInt(document.getElementById('saleMonths').value);
-      const end = new Date(); end.setMonth(end.getMonth() + months);
+      
+      const customEndDate = document.getElementById('saleCustomEndDate').value;
+      if(!customEndDate) return alert('Selecciona la fecha de vencimiento.');
+
       const vendorId = (window.db.currentUser?.role === 'vendedor' || window.db.currentUser?.role === 'vendedor_pro') ? window.db.currentUser.id : (document.getElementById('assignedVendorSelect')?.value || '1');
       const userId = document.getElementById('saleUser').value;
       const phone = document.getElementById('salePhone').value.replace(/[^0-9]/g, '');
@@ -1920,7 +1940,6 @@
       const accountPass = document.getElementById('saleAccountPass').value;
       const profileName = document.getElementById('saleProfileName')?.value || '';
       const profilePin = document.getElementById('saleProfilePin')?.value || '';
-      const endDateStr = end.toISOString().split('T')[0];
 
       let savedSaleId = editId;
 
@@ -1934,7 +1953,7 @@
           sale.type = type;
           sale.accountEmail = emailInput;
           sale.accountPass = accountPass;
-          sale.endDate = endDateStr;
+          sale.endDate = customEndDate;
           sale.profileName = profileName;
           sale.profilePin = profilePin;
         }
@@ -1952,12 +1971,12 @@
           profileName: profileName,
           profilePin: profilePin,
           startDate: new Date().toISOString().split('T')[0],
-          endDate: endDateStr
+          endDate: customEndDate
         });
       }
       await saveDB();
 
-      // Disparar envío por WhatsApp automático al cliente con la plantilla de cuenta nueva
+      // Disparar envío por WhatsApp automático al cliente con la fecha personalizada
       const u = window.db.users.find(x => x.id === userId);
       const p = window.db.platforms.find(x => x.id === platformId);
       const clientPhone = phone || (u ? u.phone : '');
@@ -1971,7 +1990,7 @@
           .replace(/{password}/g, accountPass)
           .replace(/{perfil}/g, profileName ? `${profileName} (PIN: ${profilePin || 'N/A'})` : 'FULL')
           .replace(/{pin}/g, profilePin || 'FULL')
-          .replace(/{vencimiento}/g, endDateStr)
+          .replace(/{vencimiento}/g, customEndDate)
           .replace(/{dias_restantes}/g, '30');
 
         const encoded = encodeURIComponent(message);
@@ -1991,6 +2010,7 @@
       updateSaleContactInfo();
       toggleProfileFields();
       onPlatformChange();
+      updateDefaultEndDate();
     }
 
     function renderSalesTable() {
@@ -2139,7 +2159,7 @@
 
     window.exportAllJSON = function() {
       const link = document.createElement('a');
-      link.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.db));
+      link.href = "data:text/json;charset=utf-8,"+ encodeURIComponent(JSON.stringify(window.db));
       link.download = "respaldo.json"; link.click();
     }
 
@@ -2155,6 +2175,8 @@
       if(document.getElementById('tplUpdatePass')) document.getElementById('tplUpdatePass').value = window.db.templates.updatePass;
       if(document.getElementById('tplRenewal')) document.getElementById('tplRenewal').value = window.db.templates.renewal;
       if(document.getElementById('tplExpired')) document.getElementById('tplExpired').value = window.db.templates.expired;
+
+      updateDefaultEndDate();
 
       if(window.db.currentUser) {
         let found = window.db.users.find(u => u.id === window.db.currentUser.id);
