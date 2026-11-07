@@ -1694,10 +1694,37 @@
       const filterSelect = document.getElementById('filterVendorBotDomain');
       const grid = document.getElementById('botsCardsGrid');
       if(!filterSelect || !grid) return;
-      filterSelect.innerHTML = window.db.domains.map(d => `<option value="${d.name}">@${d.name}</option>`).join('');
+      
+      if (filterSelect.options.length === 0 && window.db.domains.length > 0) {
+        filterSelect.innerHTML = window.db.domains.map(d => `<option value="${d.name}">@${d.name}</option>`).join('');
+      }
+
       const sel = filterSelect.value;
-      const filtered = window.db.bots.filter(b => b.domains?.includes(sel));
-      grid.innerHTML = filtered.length ? filtered.map(b => `<div class="bg-slate-900 border border-slate-700 rounded-xl p-4 flex justify-between"><div><h4 class="font-bold text-sm">${b.name}</h4><p class="text-[11px] text-slate-400">${b.url}</p></div><a href="${b.url}" target="_blank" class="bg-cyan-600/20 text-cyan-300 px-3 py-1 rounded text-xs flex items-center">Ejecutar</a></div>`).join('') : `<div class="col-span-full p-4 text-center text-xs text-slate-400">Sin boots</div>`;
+      const filtered = window.db.bots.filter(b => b.domains && b.domains.includes(sel));
+      
+      if (filtered.length === 0) {
+        grid.innerHTML = `<div class="col-span-full p-6 text-center text-xs text-slate-400 bg-slate-900/50 rounded-xl border border-slate-800">No hay bots registrados para el dominio @${sel}</div>`;
+        return;
+      }
+
+      grid.innerHTML = filtered.map(b => `
+        <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-4 flex flex-col justify-between space-y-3 shadow-md">
+          <div class="space-y-1">
+            <div class="flex items-center justify-between">
+              <h4 class="font-bold text-sm text-white flex items-center gap-2">
+                <i class="fa-solid fa-robot text-cyan-400"></i> ${b.name}
+              </h4>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-mono">@${sel}</span>
+            </div>
+            <p class="text-xs text-slate-400 font-mono break-all line-clamp-1">${b.url}</p>
+          </div>
+          <div class="pt-2 border-t border-slate-800 flex items-center justify-end">
+            <a href="${b.url}" target="_blank" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs py-2 rounded-lg font-medium flex items-center justify-center gap-2 shadow transition">
+              <i class="fa-solid fa-external-link-alt"></i> Abrir Boot
+            </a>
+          </div>
+        </div>
+      `).join('');
     }
 
     window.importCSV = async function(event) {
@@ -1740,7 +1767,6 @@
         { id: 'assignedAccountsView', label: 'Cuentas Asignadas', icon: 'fa-address-book', roles: ['admin', 'vendedor', 'vendedor_pro'] },
         { id: 'supportView', label: 'Soporte Técnico', icon: 'fa-headset', roles: ['admin', 'vendedor', 'vendedor_pro', 'cliente'] },
         { id: 'remindersView', label: 'Recordatorios WA', icon: 'fa-brands fa-whatsapp', roles: ['admin', 'vendedor', 'vendedor_pro'] },
-        // Configuración solo disponible para el Super Admin
         { id: 'settingsView', label: 'Configuración & Logo', icon: 'fa-gear', roles: ['admin'] },
       ];
       nav.innerHTML = items.filter(i => i.roles.includes(role)).map(i => `
