@@ -1718,13 +1718,24 @@
             </div>
             <p class="text-xs text-slate-400 font-mono break-all line-clamp-1">${b.url}</p>
           </div>
-          <div class="pt-2 border-t border-slate-800 flex items-center justify-end">
-            <a href="${b.url}" target="_blank" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs py-2 rounded-lg font-medium flex items-center justify-center gap-2 shadow transition">
+          <div class="pt-2 border-t border-slate-800 flex items-center gap-2">
+            <a href="${b.url}" target="_blank" class="flex-1 bg-cyan-600 hover:bg-cyan-500 text-white text-xs py-2 rounded-lg font-medium flex items-center justify-center gap-2 shadow transition">
               <i class="fa-solid fa-external-link-alt"></i> Abrir Boot
             </a>
+            <button onclick="deleteBot('${b.id}')" class="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 text-xs px-3 py-2 rounded-lg font-medium flex items-center justify-center gap-1.5 transition" title="Eliminar Boot">
+              <i class="fa-solid fa-trash"></i> Eliminar
+            </button>
           </div>
         </div>
       `).join('');
+    }
+
+    window.deleteBot = async function(id) {
+      if(confirm('¿Estás seguro de eliminar este bot?')) {
+        await deleteDoc(doc(dbCloud, "bots", id));
+        window.db.bots = window.db.bots.filter(b => b.id !== id);
+        renderBotsDisplay();
+      }
     }
 
     window.importCSV = async function(event) {
