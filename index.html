@@ -1488,7 +1488,7 @@
 
       let userNotifs = window.db.notifications.filter(n => {
         if(user.role === 'admin') return true;
-        if(user.role === 'vendedor' || user.role === 'vendedor_pro') return n.targetRole === 'all' && (n.vendorId === user.id || !n.vendorId);
+        if(user.role === 'vendedor' || user.role === 'vendedor_pro') return (n.targetRole === 'all' || n.targetRole === 'admin') && (n.vendorId === user.id || !n.vendorId);
         return false;
       }).sort((a,b) => new Date(b.date) - new Date(a.date));
 
@@ -1548,8 +1548,9 @@
       const s = window.db.sales.find(x => x.id === saleId);
       const assignedVendorId = s ? (s.vendorId || currentUser.id) : currentUser.id;
 
+      const ticketId = Date.now().toString();
       const ticket = {
-        id: Date.now().toString(),
+        id: ticketId,
         userId,
         vendorId: assignedVendorId,
         saleId,
@@ -1560,9 +1561,24 @@
         date: new Date().toISOString().split('T')[0]
       };
       window.db.tickets.push(ticket);
+
+      // Crear notificación directa para el Super Administrador
+      const u = window.db.users.find(x => x.id === userId);
+      const p = window.db.platforms.find(x => x.id === s?.platformId);
+      window.db.notifications.push({
+        id: `ticket_${ticketId}`,
+        targetRole: 'admin',
+        vendorId: assignedVendorId,
+        title: 'Nuevo Reporte de Soporte',
+        message: `El usuario ${u?.name || 'Cliente'} reportó un problema de "${issueType}" en ${p?.name || 'Plataforma'}.`,
+        date: new Date().toISOString(),
+        read: false
+      });
+
       await saveDB();
       document.getElementById('supportForm').reset();
       renderSupportTable();
+      renderNotificationsBadge();
       renderStats();
       alert('¡Reporte de soporte creado y enviado al Super Admin con éxito!');
     }
@@ -1572,12 +1588,12 @@
       if(!tbody) return;
       const user = window.db.currentUser;
       
-      // Permitir que administradores vean todos y los vendedores vean los de su red
-      let list = user?.role === 'cliente' 
-        ? window.db.tickets.filter(t => t.userId === user.id) 
-        : ((user?.role === 'vendedor' || user?.role === 'vendedor_pro') 
-            ? window.db.tickets.filter(t => t.vendorId === user.id || t.userId === user.id) 
-            : window.db.tickets);
+      // Permitir que administradores vean todos y los vendedores/clientes vean los suyos
+      let list = user?.role === 'admin' 
+        ? window.db.tickets 
+        : (user?.role === 'cliente' 
+            ? window.db.tickets.filter(t => t.userId === user.id) 
+            : window.db.tickets.filter(t => t.vendorId === user.id || t.userId === user.id));
 
       if(list.length === 0) {
         tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-6 text-center text-xs text-slate-400">No hay reportes de soporte activos.</td></tr>`;
@@ -1588,14 +1604,26 @@
         const u = window.db.users.find(x => x.id === t.userId);
         const s = window.db.sales.find(x => x.id === t.saleId);
         const p = window.db.platforms.find(x => x.id === s?.platformId);
+        
+        let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400">Pendiente</span>`;
+        let resolutionHtml = `<span class="text-slate-500 italic">Sin solución aún</span>`;
+
+        if (t.status === 'Solucionado') {
+          statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400">Solucionado</span>`;
+          resolutionHtml = `<div class="mt-1 p-2 bg-slate-900/90 rounded border border-emerald-500/30 text-emerald-300 text-xs"><i class="fa-solid fa-circle-check text-emerald-400"></i> <strong>Solución:</strong> ${t.resolution}</div>`;
+        }
+
         return `
           <tr class="border-b border-slate-800 hover:bg-slate-800/30">
             <td class="px-3 py-3">${u?.name || 'N/A'}<br><span class="text-[10px] text-emerald-400">WA: ${u?.phone || ''}</span></td>
             <td class="px-3 py-3">${p?.name || 'N/A'}<br><span class="text-[10px] text-slate-400">${s?.accountEmail || ''}</span></td>
-            <td class="px-3 py-3 text-xs"><strong class="text-red-300">${t.issueType}:</strong> ${t.detail}</td>
-            <td class="px-3 py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${t.status === 'Solucionado' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}">${t.status}</span></td>
+            <td class="px-3 py-3 text-xs">
+              <strong class="text-red-300">${t.issueType}:</strong> ${t.detail}
+              <div class="mt-1">${resolutionHtml}</div>
+            </td>
+            <td class="px-3 py-3">${statusBadge}</td>
             <td class="px-3 py-3 text-right">
-              ${t.status !== 'Solucionado' && user?.role !== 'cliente' ? `<button onclick="openResolveTicketModal('${t.id}')" class="bg-emerald-600 text-white text-xs px-2 py-1 rounded">Resolver</button>` : ''}
+              ${t.status !== 'Solucionado' && user?.role === 'admin' ? `<button onclick="openResolveTicketModal('${t.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2 py-1.5 rounded font-medium shadow transition">Resolver</button>` : ''}
             </td>
           </tr>
         `;
@@ -1612,15 +1640,59 @@
       e.preventDefault();
       const ticketId = document.getElementById('resolveTicketId').value;
       const note = document.getElementById('resDetailNote').value.trim();
+      const actionType = document.getElementById('resolveActionType').value;
+      
       const ticket = window.db.tickets.find(x => x.id === ticketId);
       if(ticket) {
         ticket.status = 'Solucionado';
-        ticket.resolution = note;
+        ticket.resolution = `[${actionType.toUpperCase()}] ${note}`;
+        
+        // Si se indicó nueva contraseña o correo, actualizar la cuenta asociada
+        const sale = window.db.sales.find(s => s.id === ticket.saleId);
+        if(sale) {
+          if(actionType === 'actualizar_password') {
+            const newPass = document.getElementById('resNewPass').value.trim();
+            if(newPass) { sale.accountPass = newPass; ticket.resolution += ` (Nueva Contraseña: ${newPass})`; }
+          } else if(actionType === 'actualizar_correo') {
+            const newEmail = document.getElementById('resNewEmail').value.trim().toLowerCase();
+            const newPass = document.getElementById('resNewEmailPass').value.trim();
+            if(newEmail) sale.accountEmail = newEmail;
+            if(newPass) sale.accountPass = newPass;
+            ticket.resolution += ` (Nuevo Correo: ${newEmail})`;
+          } else if(actionType === 'actualizar_perfil') {
+            const newPin = document.getElementById('resNewPin').value.trim();
+            const newProfName = document.getElementById('resNewProfileName').value.trim();
+            if(newPin) sale.profilePin = newPin;
+            if(newProfName) sale.profileName = newProfName;
+            ticket.resolution += ` (Nuevo PIN: ${newPin}, Perfil: ${newProfName})`;
+          }
+        }
+
+        // Crear notificación de resolución
+        window.db.notifications.push({
+          id: `resolved_${ticketId}`,
+          targetRole: 'all',
+          vendorId: ticket.vendorId,
+          title: 'Ticket de Soporte Resuelto',
+          message: `El Super Admin resolvió el reporte de soporte: ${note}`,
+          date: new Date().toISOString(),
+          read: false
+        });
+
         await saveDB();
         closeResolveTicketModal();
         renderSupportTable();
-        alert('¡Resuelto!');
+        renderAssignedAccountsTable();
+        renderStats();
+        alert('¡Solución guardada y notificada con éxito!');
       }
+    }
+
+    window.toggleResolutionFields = function() {
+      const type = document.getElementById('resolveActionType').value;
+      document.getElementById('resFieldPass').classList.toggle('hidden', type !== 'actualizar_password');
+      document.getElementById('resFieldEmail').classList.toggle('hidden', type !== 'actualizar_correo');
+      document.getElementById('resFieldProfile').classList.toggle('hidden', type !== 'actualizar_perfil');
     }
 
     window.handleLogin = function(e) {
