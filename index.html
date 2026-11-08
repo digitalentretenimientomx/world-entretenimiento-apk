@@ -508,7 +508,7 @@
                   </div>
                   <div>
                     <label class="block text-xs font-medium text-slate-300 mb-1">Archivo CSV de Cuentas</label>
-                    <input type="file" id="csvSalesInput" accept=".csv" class="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 cursor-pointer" onchange="importCSV(event)">
+                    <input type="file" id="csvSalesInput" accept=".csv,.txt" class="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-600 file:text-white hover:file:bg-emerald-500 cursor-pointer" onchange="importCSV(event)">
                   </div>
                 </div>
               </div>
@@ -1511,11 +1511,38 @@
       `).join('');
     }
 
-    window.toggleNotificationsDropdown = function() { document.getElementById('notifDropdown')?.classList.toggle('hidden'); }
+    window.toggleNotificationsDropdown = async function() {
+      const dropdown = document.getElementById('notifDropdown');
+      if(!dropdown) return;
+      const isHidden = dropdown.classList.contains('hidden');
+      dropdown.classList.toggle('hidden', !isHidden);
+
+      // Al abrir el menú de notificaciones, marcamos todas como leídas y borramos el contador
+      if(isHidden) {
+        const user = window.db.currentUser;
+        if(user) {
+          window.db.notifications.forEach(n => {
+            if(user.role === 'admin' || (n.targetRole === 'all' || n.targetRole === 'admin') && (n.vendorId === user.id || !n.vendorId)) {
+              n.read = true;
+            }
+          });
+          await saveDB();
+          renderNotificationsBadge();
+        }
+      }
+    }
+
     window.markAllNotificationsAsRead = async function() {
-      window.db.notifications.forEach(n => n.read = true);
-      await saveDB();
-      renderNotificationsBadge();
+      const user = window.db.currentUser;
+      if(user) {
+        window.db.notifications.forEach(n => {
+          if(user.role === 'admin' || (n.targetRole === 'all' || n.targetRole === 'admin') && (n.vendorId === user.id || !n.vendorId)) {
+            n.read = true;
+          }
+        });
+        await saveDB();
+        renderNotificationsBadge();
+      }
     }
 
     window.populateUserAccountsForSupport = function() {
@@ -1562,7 +1589,6 @@
       };
       window.db.tickets.push(ticket);
 
-      // Crear notificación directa para el Super Administrador
       const u = window.db.users.find(x => x.id === userId);
       const p = window.db.platforms.find(x => x.id === s?.platformId);
       window.db.notifications.push({
@@ -1588,7 +1614,6 @@
       if(!tbody) return;
       const user = window.db.currentUser;
       
-      // Permitir que administradores vean todos y los vendedores/clientes vean los suyos
       let list = user?.role === 'admin' 
         ? window.db.tickets 
         : (user?.role === 'cliente' 
@@ -1647,7 +1672,6 @@
         ticket.status = 'Solucionado';
         ticket.resolution = `[${actionType.toUpperCase()}] ${note}`;
         
-        // Si se indicó nueva contraseña o correo, actualizar la cuenta asociada
         const sale = window.db.sales.find(s => s.id === ticket.saleId);
         if(sale) {
           if(actionType === 'actualizar_password') {
@@ -1668,7 +1692,6 @@
           }
         }
 
-        // Crear notificación de resolución
         window.db.notifications.push({
           id: `resolved_${ticketId}`,
           targetRole: 'all',
@@ -1851,11 +1874,15 @@
       
       const reader = new FileReader();
       reader.onload = async function(e) {
-        const lines = e.target.result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        const textContent = e.target.result;
+        const lines = textContent.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
         let importedCount = 0;
 
         for(let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(',').map(c => c.replace(/^"(.*)"$/, '$1').trim());
+          const line = lines[i];
+          const delimiter = line.includes(';') ? ';' : ',';
+          const cols = line.split(delimiter).map(c => c.replace(/^"(.*)"$/, '$1').trim());
+          
           if(cols.length >= 4) {
             const email = cols[3].toLowerCase();
             if(!window.isDomainAuthorized(email)) continue;
