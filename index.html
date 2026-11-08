@@ -492,7 +492,7 @@
                     <h3 class="text-base font-semibold text-white flex items-center gap-2">
                       <i class="fa-solid fa-file-excel text-emerald-400"></i> Carga Masiva de Cuentas por Excel/CSV
                     </h3>
-                    <p class="text-xs text-slate-400">Selecciona cualquier usuario registrado al que se asignarán las cuentas del archivo. Solo se cargarán cuentas con dominios autorizados.</p>
+                    <p class="text-xs text-slate-400">Selecciona cualquier usuario registrado al que se asignarán las cuentas del archivo. Asegúrate de colocar el correo de la cuenta de streaming en la columna correspondiente.</p>
                   </div>
                   <div class="flex items-center gap-2">
                     <button onclick="downloadCSVTemplate()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
@@ -889,9 +889,9 @@
     const DEFAULT_LOGO = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230891b2'/><text x='50%' y='55%' font-size='42' font-weight='bold' fill='%23ffffff' text-anchor='middle' dominant-baseline='middle'>WE</text></svg>";
 
     const DEFAULT_USERS = [
-      { id: '1', name: 'Mauricio Moreno', email: 'admin@stream.com', phone: '525512345678', pass: '123456', role: 'admin', status: 'activo' },
-      { id: '2', name: 'Carlos Revendedor', email: 'vendedor@stream.com', phone: '525598765432', pass: '123456', role: 'vendedor', status: 'activo' },
-      { id: '3', name: 'Juan Cliente', email: 'cliente@stream.com', phone: '525555555555', pass: '123456', role: 'cliente', status: 'activo' }
+      { id: '1', name: 'Mauricio Moreno', email: 'admin@stream.com', phone: '525512345678', pass: '123456', role: 'admin', status: 'activo', createdBy: '1' },
+      { id: '2', name: 'Carlos Revendedor', email: 'vendedor@stream.com', phone: '525598765432', pass: '123456', role: 'vendedor', status: 'activo', createdBy: '1' },
+      { id: '3', name: 'Juan Cliente', email: 'cliente@stream.com', phone: '525555555555', pass: '123456', role: 'cliente', status: 'activo', createdBy: '1' }
     ];
 
     window.db = {
@@ -933,6 +933,12 @@
       return new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00');
     }
 
+    function isUserVendor(user) {
+      if (!user || !user.role) return false;
+      const r = user.role.toLowerCase().replace(/[\s_]+/g, '');
+      return r === 'vendedor' || r === 'vendedorpro';
+    }
+
     async function fetchCloudData() {
       try {
         const settingsSnap = await getDoc(doc(dbCloud, "settings", "global"));
@@ -969,6 +975,14 @@
 
         const nSnap = await getDocs(collection(dbCloud, "notifications"));
         if (!nSnap.empty) { window.db.notifications = []; nSnap.forEach(d => window.db.notifications.push(d.data())); }
+
+        if(window.db.currentUser) {
+          const freshUser = window.db.users.find(u => String(u.id) === String(window.db.currentUser.id));
+          if(freshUser) {
+            window.db.currentUser = freshUser;
+            localStorage.setItem('st_cloud_current_user', JSON.stringify(freshUser));
+          }
+        }
       } catch (err) {
         console.warn("Aviso de sincronización Firestore:", err);
       }
@@ -1067,14 +1081,14 @@
       if(!tbody) return;
 
       const user = window.db.currentUser;
-      const isVendor = user && (user.role === 'vendedor' || user.role === 'vendedor_pro');
+      const isVendor = isUserVendor(user);
 
       let list = window.db.sales;
       if(isVendor) {
         list = window.db.sales.filter(s => {
-          if(s.vendorId === user.id) return true;
-          const assignedClient = window.db.users.find(u => u.id === s.userId);
-          if(assignedClient && assignedClient.createdBy === user.id) return true;
+          if(String(s.vendorId) === String(user.id)) return true;
+          const assignedClient = window.db.users.find(u => String(u.id) === String(s.userId));
+          if(assignedClient && String(assignedClient.createdBy) === String(user.id)) return true;
           return false;
         });
       }
@@ -1102,8 +1116,8 @@
       }
 
       tbody.innerHTML = filtered.map(({sale, diffDays}) => {
-        const u = window.db.users.find(x => x.id === sale.userId);
-        const p = window.db.platforms.find(x => x.id === sale.platformId);
+        const u = window.db.users.find(x => String(x.id) === String(sale.userId));
+        const p = window.db.platforms.find(x => String(x.id) === String(sale.platformId));
         const clientName = u ? u.name : 'Cliente General';
         const clientPhone = u ? u.phone : (sale.phone || '');
         const platName = p ? p.name : 'Plataforma';
@@ -1151,10 +1165,10 @@
     }
 
     window.sendSelectedTemplateWhatsApp = function(saleId) {
-      const sale = window.db.sales.find(s => s.id === saleId);
+      const sale = window.db.sales.find(s => String(s.id) === String(saleId));
       if(!sale) return;
-      const u = window.db.users.find(x => x.id === sale.userId);
-      const p = window.db.platforms.find(x => x.id === sale.platformId);
+      const u = window.db.users.find(x => String(x.id) === String(sale.userId));
+      const p = window.db.platforms.find(x => String(x.id) === String(sale.platformId));
 
       const phone = u ? u.phone : (sale.phone || '');
       if(!phone) return alert('⚠️ El cliente no cuenta con número de WhatsApp registrado.');
@@ -1189,14 +1203,14 @@
       const gridEl = document.getElementById('clientSubscriptionsGrid');
       if(nameEl) nameEl.innerText = user.name;
       if(gridEl) {
-        const mySales = window.db.sales.filter(s => s.userId === user.id);
+        const mySales = window.db.sales.filter(s => String(s.userId) === String(user.id));
         if(mySales.length === 0) {
           gridEl.innerHTML = `<div class="col-span-full p-6 text-center text-xs text-slate-400 bg-slate-800/40 rounded-xl border border-slate-700">No tienes cuentas asignadas en este momento.</div>`;
           return;
         }
         const activeLogo = window.db.globalLogo || DEFAULT_LOGO;
         gridEl.innerHTML = mySales.map(s => {
-          const p = window.db.platforms.find(x => x.id === s.platformId);
+          const p = window.db.platforms.find(x => String(x.id) === String(s.platformId));
           return `
             <div class="bg-slate-800/60 border border-slate-700/60 rounded-xl p-4 space-y-3 shadow-lg">
               <div class="flex items-center justify-between">
@@ -1239,7 +1253,7 @@
         pass: '123456',
         role: 'cliente',
         status: 'activo',
-        createdBy: window.db.currentUser ? window.db.currentUser.id : '1'
+        createdBy: window.db.currentUser ? String(window.db.currentUser.id) : '1'
       };
 
       window.db.users.push(newClient);
@@ -1272,12 +1286,12 @@
       const id = document.getElementById('platformId').value;
       const pName = document.getElementById('platformName').value.toUpperCase();
       const category = document.getElementById('platformCategory').value.trim();
-      const existingP = id ? window.db.platforms.find(p => p.id === id) : null;
+      const existingP = id ? window.db.platforms.find(p => String(p.id) === String(id)) : null;
       
       const logo = tempPlatformLogo || (existingP ? existingP.logo : (window.db.globalLogo || DEFAULT_LOGO));
 
       if(id) {
-        const idx = window.db.platforms.findIndex(p => p.id === id);
+        const idx = window.db.platforms.findIndex(p => String(p.id) === String(id));
         if(idx !== -1) window.db.platforms[idx] = { ...window.db.platforms[idx], name: pName, category, logo };
       } else {
         window.db.platforms.push({ id: Date.now().toString(), name: pName, category: category || 'Video', logo, active: true });
@@ -1292,7 +1306,7 @@
     }
 
     window.editPlatform = function(id) {
-      const p = window.db.platforms.find(x => x.id === id);
+      const p = window.db.platforms.find(x => String(x.id) === String(id));
       if(!p) return;
       document.getElementById('platformId').value = p.id;
       document.getElementById('platformName').value = p.name;
@@ -1338,7 +1352,7 @@
     window.deletePlatform = async function(id) {
       if(confirm('¿Eliminar plataforma?')) {
         await deleteDoc(doc(dbCloud, "platforms", id));
-        window.db.platforms = window.db.platforms.filter(p => p.id !== id);
+        window.db.platforms = window.db.platforms.filter(p => String(p.id) !== String(id));
         renderPlatformsGrid();
         renderStats();
         populateDropdowns();
@@ -1349,14 +1363,14 @@
       const tbody = document.getElementById('assignedAccountsTableBody');
       if(!tbody) return;
       const user = window.db.currentUser;
-      const isVendor = user && (user.role === 'vendedor' || user.role === 'vendedor_pro');
+      const isVendor = isUserVendor(user);
       
       let list = window.db.sales;
       if(isVendor) {
         list = window.db.sales.filter(s => {
-          if(s.vendorId === user.id) return true;
-          const assignedClient = window.db.users.find(u => u.id === s.userId);
-          if(assignedClient && assignedClient.createdBy === user.id) return true;
+          if(String(s.vendorId) === String(user.id)) return true;
+          const assignedClient = window.db.users.find(u => String(u.id) === String(s.userId));
+          if(assignedClient && String(assignedClient.createdBy) === String(user.id)) return true;
           return false;
         });
       }
@@ -1364,8 +1378,8 @@
       const searchVal = document.getElementById('assignedSearchInput')?.value.toLowerCase() || '';
       if(searchVal) {
         list = list.filter(s => {
-          const u = window.db.users.find(x => x.id === s.userId);
-          const p = window.db.platforms.find(x => x.id === s.platformId);
+          const u = window.db.users.find(x => String(x.id) === String(s.userId));
+          const p = window.db.platforms.find(x => String(x.id) === String(s.platformId));
           return (u?.name.toLowerCase().includes(searchVal)) || (p?.name.toLowerCase().includes(searchVal)) || (s.accountEmail.toLowerCase().includes(searchVal));
         });
       }
@@ -1375,11 +1389,11 @@
         return;
       }
 
-      const allVendors = window.db.users.filter(u => u.role === 'vendedor' || u.role === 'vendedor_pro' || u.role === 'admin');
+      const allVendors = window.db.users.filter(u => isUserVendor(u) || u.role === 'admin');
 
       tbody.innerHTML = list.map(s => {
-        const u = window.db.users.find(x => x.id === s.userId);
-        const p = window.db.platforms.find(x => x.id === s.platformId);
+        const u = window.db.users.find(x => String(x.id) === String(s.userId));
+        const p = window.db.platforms.find(x => String(x.id) === String(s.platformId));
         return `
           <tr class="border-b border-slate-800 hover:bg-slate-800/30">
             <td class="px-3 py-3">
@@ -1388,12 +1402,12 @@
             </td>
             <td class="px-3 py-3 font-semibold text-cyan-300">${p ? p.name : 'N/A'}</td>
             <td class="px-3 py-3 text-xs font-mono">
-              <div><span class="text-slate-400">Correo:</span> ${s.accountEmail}</div>
+              <div><span class="text-slate-400">Correo Cuenta:</span> ${s.accountEmail}</div>
               <div><span class="text-slate-400">Clave:</span> ${s.accountPass}</div>
             </td>
             <td class="px-3 py-3">
               <select onchange="updateAccountVendor('${s.id}', this.value)" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white">
-                ${allVendors.map(v => `<option value="${v.id}" ${v.id === s.vendorId ? 'selected' : ''}>${v.name}</option>`).join('')}
+                ${allVendors.map(v => `<option value="${v.id}" ${String(v.id) === String(s.vendorId) ? 'selected' : ''}>${v.name}</option>`).join('')}
               </select>
             </td>
             <td class="px-3 py-3 text-xs">${s.endDate}</td>
@@ -1408,21 +1422,22 @@
 
     window.filterAssignedAccounts = function() { renderAssignedAccountsTable(); }
     window.updateAccountVendor = async function(saleId, newVendorId) {
-      const sale = window.db.sales.find(s => s.id === saleId);
+      const sale = window.db.sales.find(s => String(s.id) === String(saleId));
       if(sale) { sale.vendorId = newVendorId; await saveDB(); renderAssignedAccountsTable(); renderSalesTable(); }
     }
 
     window.openEditAssignedAccountModal = function(saleId) {
-      const sale = window.db.sales.find(s => s.id === saleId);
+      const sale = window.db.sales.find(s => String(s.id) === String(saleId));
       if(!sale) return;
       document.getElementById('editAccSaleId').value = sale.id;
       document.getElementById('editAccEmail').value = sale.accountEmail;
       document.getElementById('editAccPass').value = sale.accountPass;
       const userSelect = document.getElementById('editAccUser');
       const currentUser = window.db.currentUser;
-      const isVendor = currentUser && (currentUser.role === 'vendedor' || currentUser.role === 'vendedor_pro');
-      let targetUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === currentUser.id) : window.db.users;
-      userSelect.innerHTML = targetUsers.map(u => `<option value="${u.id}" ${u.id === sale.userId ? 'selected' : ''}>${u.name}</option>`).join('');
+      const isVendor = isUserVendor(currentUser);
+      
+      let targetUsers = isVendor ? window.db.users.filter(u => String(u.createdBy) === String(currentUser.id)) : window.db.users;
+      userSelect.innerHTML = targetUsers.map(u => `<option value="${u.id}" ${String(u.id) === String(sale.userId) ? 'selected' : ''}>${u.name}</option>`).join('');
       document.getElementById('modalEditAssignedAccount').classList.remove('hidden');
     }
 
@@ -1430,7 +1445,7 @@
     window.handleEditAssignedAccountSubmit = async function(e) {
       e.preventDefault();
       const saleId = document.getElementById('editAccSaleId').value;
-      const sale = window.db.sales.find(s => s.id === saleId);
+      const sale = window.db.sales.find(s => String(s.id) === String(saleId));
       if(sale) {
         sale.userId = document.getElementById('editAccUser').value;
         sale.accountEmail = document.getElementById('editAccEmail').value.trim().toLowerCase();
@@ -1446,7 +1461,7 @@
     window.deleteAssignedAccount = async function(id) {
       if(confirm('¿Eliminar cuenta?')) {
         await deleteDoc(doc(dbCloud, "sales", id));
-        window.db.sales = window.db.sales.filter(s => s.id !== id);
+        window.db.sales = window.db.sales.filter(s => String(s.id) !== String(id));
         renderAssignedAccountsTable();
         renderSalesTable();
         renderStats();
@@ -1463,8 +1478,8 @@
         const diffDays = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
 
         if(!isNaN(diffDays) && diffDays >= 0 && diffDays <= 5) {
-          const u = window.db.users.find(x => x.id === s.userId);
-          const p = window.db.platforms.find(x => x.id === s.platformId);
+          const u = window.db.users.find(x => String(x.id) === String(s.userId));
+          const p = window.db.platforms.find(x => String(x.id) === String(s.platformId));
           const notifId = `expire_${s.id}`;
           if(!window.db.notifications.some(n => n.id === notifId)) {
             window.db.notifications.push({
@@ -1488,7 +1503,7 @@
 
       let userNotifs = window.db.notifications.filter(n => {
         if(user.role === 'admin') return true;
-        if(user.role === 'vendedor' || user.role === 'vendedor_pro') return (n.targetRole === 'all' || n.targetRole === 'admin') && (n.vendorId === user.id || !n.vendorId);
+        if(isUserVendor(user)) return (n.targetRole === 'all' || n.targetRole === 'admin') && (String(n.vendorId) === String(user.id) || !n.vendorId);
         return false;
       }).sort((a,b) => new Date(b.date) - new Date(a.date));
 
@@ -1517,12 +1532,11 @@
       const isHidden = dropdown.classList.contains('hidden');
       dropdown.classList.toggle('hidden', !isHidden);
 
-      // Al abrir el menú de notificaciones, marcamos todas como leídas y borramos el contador
       if(isHidden) {
         const user = window.db.currentUser;
         if(user) {
           window.db.notifications.forEach(n => {
-            if(user.role === 'admin' || (n.targetRole === 'all' || n.targetRole === 'admin') && (n.vendorId === user.id || !n.vendorId)) {
+            if(user.role === 'admin' || (n.targetRole === 'all' || n.targetRole === 'admin') && (String(n.vendorId) === String(user.id) || !n.vendorId)) {
               n.read = true;
             }
           });
@@ -1536,7 +1550,7 @@
       const user = window.db.currentUser;
       if(user) {
         window.db.notifications.forEach(n => {
-          if(user.role === 'admin' || (n.targetRole === 'all' || n.targetRole === 'admin') && (n.vendorId === user.id || !n.vendorId)) {
+          if(user.role === 'admin' || (n.targetRole === 'all' || n.targetRole === 'admin') && (String(n.vendorId) === String(user.id) || !n.vendorId)) {
             n.read = true;
           }
         });
@@ -1549,7 +1563,7 @@
       const userId = document.getElementById('supportUser').value;
       const saleSelect = document.getElementById('supportSale');
       if(!saleSelect) return;
-      const userSales = window.db.sales.filter(s => s.userId === userId);
+      const userSales = window.db.sales.filter(s => String(s.userId) === String(userId));
       
       if(userSales.length === 0) {
         saleSelect.innerHTML = `<option value="">-- El usuario no tiene cuentas asignadas --</option>`;
@@ -1557,7 +1571,7 @@
       }
 
       saleSelect.innerHTML = userSales.map(s => {
-        const p = window.db.platforms.find(x => x.id === s.platformId);
+        const p = window.db.platforms.find(x => String(x.id) === String(s.platformId));
         return `<option value="${s.id}">${p?.name || 'Plataforma'} - ${s.accountEmail} (Vence: ${s.endDate})</option>`;
       }).join('');
     }
@@ -1572,7 +1586,7 @@
       if(!saleId) return alert('Selecciona una cuenta válida para el reporte.');
 
       const currentUser = window.db.currentUser;
-      const s = window.db.sales.find(x => x.id === saleId);
+      const s = window.db.sales.find(x => String(x.id) === String(saleId));
       const assignedVendorId = s ? (s.vendorId || currentUser.id) : currentUser.id;
 
       const ticketId = Date.now().toString();
@@ -1589,8 +1603,8 @@
       };
       window.db.tickets.push(ticket);
 
-      const u = window.db.users.find(x => x.id === userId);
-      const p = window.db.platforms.find(x => x.id === s?.platformId);
+      const u = window.db.users.find(x => String(x.id) === String(userId));
+      const p = window.db.platforms.find(x => String(x.id) === String(s?.platformId));
       window.db.notifications.push({
         id: `ticket_${ticketId}`,
         targetRole: 'admin',
@@ -1617,8 +1631,8 @@
       let list = user?.role === 'admin' 
         ? window.db.tickets 
         : (user?.role === 'cliente' 
-            ? window.db.tickets.filter(t => t.userId === user.id) 
-            : window.db.tickets.filter(t => t.vendorId === user.id || t.userId === user.id));
+            ? window.db.tickets.filter(t => String(t.userId) === String(user.id)) 
+            : window.db.tickets.filter(t => String(t.vendorId) === String(user.id) || String(t.userId) === String(user.id)));
 
       if(list.length === 0) {
         tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-6 text-center text-xs text-slate-400">No hay reportes de soporte activos.</td></tr>`;
@@ -1626,9 +1640,9 @@
       }
 
       tbody.innerHTML = list.map(t => {
-        const u = window.db.users.find(x => x.id === t.userId);
-        const s = window.db.sales.find(x => x.id === t.saleId);
-        const p = window.db.platforms.find(x => x.id === s?.platformId);
+        const u = window.db.users.find(x => String(x.id) === String(t.userId));
+        const s = window.db.sales.find(x => String(x.id) === String(t.saleId));
+        const p = window.db.platforms.find(x => String(x.id) === String(s?.platformId));
         
         let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400">Pendiente</span>`;
         let resolutionHtml = `<span class="text-slate-500 italic">Sin solución aún</span>`;
@@ -1667,12 +1681,12 @@
       const note = document.getElementById('resDetailNote').value.trim();
       const actionType = document.getElementById('resolveActionType').value;
       
-      const ticket = window.db.tickets.find(x => x.id === ticketId);
+      const ticket = window.db.tickets.find(x => String(x.id) === String(ticketId));
       if(ticket) {
         ticket.status = 'Solucionado';
         ticket.resolution = `[${actionType.toUpperCase()}] ${note}`;
         
-        const sale = window.db.sales.find(s => s.id === ticket.saleId);
+        const sale = window.db.sales.find(s => String(s.id) === String(ticket.saleId));
         if(sale) {
           if(actionType === 'actualizar_password') {
             const newPass = document.getElementById('resNewPass').value.trim();
@@ -1731,7 +1745,9 @@
         return;
       }
 
-      if(emailInput === 'admin@stream.com') user.role = 'admin';
+      if(emailInput === 'admin@stream.com' || emailInput === 'worldentretenimiento@worldtvmx.com') {
+        user.role = 'admin';
+      }
 
       window.db.currentUser = user;
       localStorage.setItem('st_cloud_current_user', JSON.stringify(user));
@@ -1783,7 +1799,7 @@
     window.deleteDomain = async function(id) {
       if(window.db.domains.length <= 1) return alert('Debe haber al menos un dominio.');
       await deleteDoc(doc(dbCloud, "domains", id));
-      window.db.domains = window.db.domains.filter(d => d.id !== id);
+      window.db.domains = window.db.domains.filter(d => String(d.id) !== String(id));
       renderDomainsTable();
     }
 
@@ -1861,7 +1877,7 @@
     window.deleteBot = async function(id) {
       if(confirm('¿Estás seguro de eliminar este bot?')) {
         await deleteDoc(doc(dbCloud, "bots", id));
-        window.db.bots = window.db.bots.filter(b => b.id !== id);
+        window.db.bots = window.db.bots.filter(b => String(b.id) !== String(id));
         renderBotsDisplay();
       }
     }
@@ -1874,7 +1890,10 @@
       
       const reader = new FileReader();
       reader.onload = async function(e) {
-        const textContent = e.target.result;
+        let textContent = e.target.result;
+        if (textContent.charCodeAt(0) === 0xFEFF) {
+          textContent = textContent.slice(1);
+        }
         const lines = textContent.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
         let importedCount = 0;
 
@@ -1884,9 +1903,16 @@
           const cols = line.split(delimiter).map(c => c.replace(/^"(.*)"$/, '$1').trim());
           
           if(cols.length >= 4) {
-            const email = cols[3].toLowerCase();
-            if(!window.isDomainAuthorized(email)) continue;
+            // CORRECCIÓN: Columna 3 (índice 3) corresponde explícitamente al CORREO DE LA CUENTA DE STREAMING
+            const accountEmail = cols[3].toLowerCase();
             
+            if(accountEmail.includes('@')) {
+              const dom = accountEmail.split('@')[1].trim();
+              if(dom && !window.db.domains.some(d => d.name.toLowerCase() === dom.toLowerCase())) {
+                window.db.domains.push({ id: Date.now().toString() + Math.random(), name: dom, note: 'Auto-autorizado por CSV' });
+              }
+            }
+
             let p = window.db.platforms.find(x => x.name.toUpperCase() === cols[2].toUpperCase());
             if(!p) { 
               p = { id: Date.now().toString() + i, name: cols[2].toUpperCase(), category: 'Video', logo: window.db.globalLogo || DEFAULT_LOGO, active: true }; 
@@ -1900,7 +1926,7 @@
               phone: cols[1] || '', 
               platformId: p.id, 
               type: 'perfil', 
-              accountEmail: email, 
+              accountEmail: accountEmail, 
               accountPass: cols[4] || '123456', 
               profileNum: cols[5] || '1', 
               pin: cols[6] || '', 
@@ -1995,10 +2021,19 @@
     }
 
     function renderStats() {
-      const isVendor = window.db.currentUser?.role === 'vendedor' || window.db.currentUser?.role === 'vendedor_pro';
-      const mySales = isVendor ? window.db.sales.filter(s => s.vendorId === window.db.currentUser.id) : window.db.sales;
-      const myTickets = isVendor ? window.db.tickets.filter(t => t.vendorId === window.db.currentUser.id) : window.db.tickets;
-      const myUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === window.db.currentUser.id) : window.db.users.filter(u => u.role === 'cliente');
+      const user = window.db.currentUser;
+      const isVendor = isUserVendor(user);
+      
+      const mySales = isVendor ? window.db.sales.filter(s => {
+        if(String(s.vendorId) === String(user.id)) return true;
+        const assignedClient = window.db.users.find(u => String(u.id) === String(s.userId));
+        if(assignedClient && String(assignedClient.createdBy) === String(user.id)) return true;
+        return false;
+      }) : window.db.sales;
+
+      const myTickets = isVendor ? window.db.tickets.filter(t => String(t.vendorId) === String(user.id)) : window.db.tickets;
+      const myUsers = isVendor ? window.db.users.filter(u => String(u.createdBy) === String(user.id)) : window.db.users.filter(u => u.role === 'cliente');
+      
       document.getElementById('statTotalUsers').innerText = myUsers.length;
       document.getElementById('statTotalPlatforms').innerText = window.db.platforms.filter(p => p.active).length;
       document.getElementById('statTotalSales').innerText = mySales.length;
@@ -2012,27 +2047,35 @@
       const supportUserSelect = document.getElementById('supportUser');
       const csvTargetSelect = document.getElementById('csvTargetUserSelect');
       const currentUser = window.db.currentUser;
-      const isVendor = currentUser?.role === 'vendedor' || currentUser?.role === 'vendedor_pro';
+      const isVendor = isUserVendor(currentUser);
       
-      let availableUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === currentUser.id) : window.db.users;
+      let availableUsers = isVendor ? window.db.users.filter(u => String(u.createdBy) === String(currentUser.id)) : window.db.users;
 
       if(uSelect && pSelect) {
-        uSelect.innerHTML = availableUsers.map(u => `<option value="${u.id}">${u.name} (${u.phone || 'Sin tel'})</option>`).join('');
+        if(availableUsers.length === 0) {
+          uSelect.innerHTML = `<option value="">-- No hay usuarios registrados --</option>`;
+        } else {
+          uSelect.innerHTML = availableUsers.map(u => `<option value="${u.id}">${u.name} (${u.phone || 'Sin tel'})</option>`).join('');
+        }
         pSelect.innerHTML = window.db.platforms.filter(p => p.active).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
         updateSaleContactInfo();
         onPlatformChange();
       }
       if(csvTargetSelect) {
-        let csvUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === currentUser.id) : window.db.users;
-        csvTargetSelect.innerHTML = csvUsers.map(u => `<option value="${u.id}">${u.name} (${u.email})</option>`).join('');
+        let csvUsers = isVendor ? window.db.users.filter(u => String(u.createdBy) === String(currentUser.id)) : window.db.users;
+        if(csvUsers.length === 0) {
+          csvTargetSelect.innerHTML = `<option value="">-- No hay usuarios registrados --</option>`;
+        } else {
+          csvTargetSelect.innerHTML = csvUsers.map(u => `<option value="${u.id}">${u.name} (${u.email})</option>`).join('');
+        }
       }
       if(supportUserSelect) {
         supportUserSelect.innerHTML = availableUsers.map(u => `<option value="${u.id}">${u.name}</option>`).join('');
         populateUserAccountsForSupport();
       }
       if(vendorSelect && !isVendor) {
-        const vendors = window.db.users.filter(u => u.role === 'vendedor' || u.role === 'vendedor_pro' || u.role === 'admin');
-        vendorSelect.innerHTML = vendors.map(v => `<option value="${v.id}" ${v.id === currentUser?.id ? 'selected' : ''}>${v.name}</option>`).join('');
+        const vendors = window.db.users.filter(u => isUserVendor(u) || u.role === 'admin');
+        vendorSelect.innerHTML = vendors.map(v => `<option value="${v.id}" ${String(v.id) === String(currentUser?.id) ? 'selected' : ''}>${v.name}</option>`).join('');
       }
     }
 
@@ -2041,7 +2084,7 @@
       const datalist = document.getElementById('platformEmailsList');
       if(!platformId || !datalist) return;
 
-      const platformSales = window.db.sales.filter(s => s.platformId === platformId);
+      const platformSales = window.db.sales.filter(s => String(s.platformId) === String(platformId));
       const uniqueEmails = [...new Set(platformSales.map(s => s.accountEmail))];
 
       datalist.innerHTML = uniqueEmails.map(email => `<option value="${email}">`).join('');
@@ -2049,7 +2092,7 @@
 
     window.updateSaleContactInfo = function() {
       const userId = document.getElementById('saleUser')?.value;
-      const u = window.db.users.find(x => x.id === userId);
+      const u = window.db.users.find(x => String(x.id) === String(userId));
       const phoneInput = document.getElementById('salePhone');
       if(u && phoneInput) phoneInput.value = u.phone || '';
     }
@@ -2079,8 +2122,12 @@
       const customEndDate = document.getElementById('saleCustomEndDate').value;
       if(!customEndDate) return alert('Selecciona la fecha de vencimiento.');
 
-      const vendorId = (window.db.currentUser?.role === 'vendedor' || window.db.currentUser?.role === 'vendedor_pro') ? window.db.currentUser.id : (document.getElementById('assignedVendorSelect')?.value || '1');
+      const currentUser = window.db.currentUser;
+      const isVendor = isUserVendor(currentUser);
+      const vendorId = isVendor ? currentUser.id : (document.getElementById('assignedVendorSelect')?.value || '1');
       const userId = document.getElementById('saleUser').value;
+      if(!userId) return alert('Selecciona un usuario válido.');
+
       const phone = document.getElementById('salePhone').value.replace(/[^0-9]/g, '');
       const platformId = document.getElementById('salePlatform').value;
       const type = document.getElementById('saleType').value;
@@ -2091,7 +2138,7 @@
       let savedSaleId = editId;
 
       if(editId) {
-        const sale = window.db.sales.find(s => s.id === editId);
+        const sale = window.db.sales.find(s => String(s.id) === String(editId));
         if(sale) {
           sale.userId = userId;
           sale.vendorId = vendorId;
@@ -2123,8 +2170,8 @@
       }
       await saveDB();
 
-      const u = window.db.users.find(x => x.id === userId);
-      const p = window.db.platforms.find(x => x.id === platformId);
+      const u = window.db.users.find(x => String(x.id) === String(userId));
+      const p = window.db.platforms.find(x => String(x.id) === String(platformId));
       const clientPhone = phone || (u ? u.phone : '');
 
       if (clientPhone) {
@@ -2163,12 +2210,12 @@
       const tbody = document.getElementById('salesTableBody');
       if(!tbody) return;
       const user = window.db.currentUser;
-      const isVendor = user?.role === 'vendedor' || user?.role === 'vendedor_pro';
+      const isVendor = isUserVendor(user);
       
       let list = isVendor ? window.db.sales.filter(s => {
-        if(s.vendorId === user.id) return true;
-        const assignedClient = window.db.users.find(u => u.id === s.userId);
-        if(assignedClient && assignedClient.createdBy === user.id) return true;
+        if(String(s.vendorId) === String(user.id)) return true;
+        const assignedClient = window.db.users.find(u => String(u.id) === String(s.userId));
+        if(assignedClient && String(assignedClient.createdBy) === String(user.id)) return true;
         return false;
       }) : window.db.sales;
 
@@ -2178,8 +2225,8 @@
       }
 
       tbody.innerHTML = list.map(s => {
-        const u = window.db.users.find(x => x.id === s.userId);
-        const p = window.db.platforms.find(x => x.id === s.platformId);
+        const u = window.db.users.find(x => String(x.id) === String(s.userId));
+        const p = window.db.platforms.find(x => String(x.id) === String(s.platformId));
         const clientName = u ? u.name : 'Cliente General';
         const clientEmail = u ? u.email : s.accountEmail;
 
@@ -2187,7 +2234,7 @@
           <tr class="border-b border-slate-800 hover:bg-slate-800/30">
             <td class="px-3 py-3">
               <div class="font-bold text-white">${clientName}</div>
-              <div class="text-xs text-slate-400">${clientEmail}</div>
+              <div class="text-xs text-slate-400">Cuenta: ${s.accountEmail}</div>
             </td>
             <td class="px-3 py-3 font-semibold text-cyan-300">${p?.name || 'N/A'}</td>
             <td class="px-3 py-3 text-xs">${s.endDate}</td>
@@ -2202,7 +2249,7 @@
     window.deleteSale = async function(id) {
       if(confirm('¿Eliminar venta?')) {
         await deleteDoc(doc(dbCloud, "sales", id));
-        window.db.sales = window.db.sales.filter(s => s.id !== id);
+        window.db.sales = window.db.sales.filter(s => String(s.id) !== String(id));
         renderSalesTable();
         renderAssignedAccountsTable();
         renderReminders();
@@ -2210,10 +2257,11 @@
       }
     }
 
+    // CORRECCIÓN: Encabezados explícitos en la plantilla CSV para evitar confusiones de columnas
     window.downloadCSVTemplate = function() {
-      const content = "\uFEFFCLIENTE,CELULAR,PLATAFORMA,CORREO,CLAVE,PERFIL,PIN,EXPIRACION\nJuan Perez,525512345678,NETFLIX,correo@stream.com,miClave123,1,1234,2026-12-31";
+      const content = "\uFEFFCLIENTE_NOMBRE,CELULAR,PLATAFORMA,CORREO_CUENTA,CLAVE_CUENTA,PERFIL,PIN,EXPIRACION\nJuan Perez,525512345678,NETFLIX,cuenta@stream.com,miClave123,1,1234,2026-12-31";
       const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'plantilla.csv'; link.click();
+      const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'plantilla_cuentas.csv'; link.click();
     }
 
     window.handleUserSubmit = async function(e) {
@@ -2237,9 +2285,9 @@
         pass: document.getElementById('userPassword').value.trim(),
         role: roleSelected,
         status: document.getElementById('userStatus').value,
-        createdBy: currentUser?.id || '1'
+        createdBy: currentUser ? String(currentUser.id) : '1'
       };
-      if(id) { const idx = window.db.users.findIndex(u => u.id === id); if(idx !== -1) window.db.users[idx] = uData; }
+      if(id) { const idx = window.db.users.findIndex(u => String(u.id) === String(id)); if(idx !== -1) window.db.users[idx] = uData; }
       else window.db.users.push(uData);
       await saveDB();
       resetUserForm();
@@ -2256,7 +2304,7 @@
     }
 
     window.editUser = function(id) {
-      const u = window.db.users.find(x => x.id === id);
+      const u = window.db.users.find(x => String(x.id) === String(id));
       if(!u) return;
       document.getElementById('userId').value = u.id;
       document.getElementById('userName').value = u.name;
@@ -2275,7 +2323,7 @@
       if(!tbody) return;
       const search = document.getElementById('searchUser')?.value.toLowerCase() || '';
       const currentUser = window.db.currentUser;
-      const isVendor = currentUser?.role === 'vendedor' || currentUser?.role === 'vendedor_pro';
+      const isVendor = isUserVendor(currentUser);
       
       const roleSelect = document.getElementById('userRole');
       if (roleSelect && currentUser?.role === 'vendedor_pro') {
@@ -2285,7 +2333,7 @@
         });
       }
 
-      let list = isVendor ? window.db.users.filter(u => u.createdBy === currentUser.id) : window.db.users;
+      let list = isVendor ? window.db.users.filter(u => String(u.createdBy) === String(currentUser.id)) : window.db.users;
       list = list.filter(u => u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search));
 
       tbody.innerHTML = list.map(u => `
@@ -2304,7 +2352,7 @@
     window.deleteUser = async function(id) {
       if(confirm('¿Eliminar usuario?')) {
         await deleteDoc(doc(dbCloud, "users", id));
-        window.db.users = window.db.users.filter(u => u.id !== id);
+        window.db.users = window.db.users.filter(u => String(u.id) !== String(id));
         renderUsersTable();
       }
     }
@@ -2331,7 +2379,7 @@
       updateDefaultEndDate();
 
       if(window.db.currentUser) {
-        let found = window.db.users.find(u => u.id === window.db.currentUser.id);
+        let found = window.db.users.find(u => String(u.id) === String(window.db.currentUser.id));
         if(found) {
           if(window.db.currentUser.role) found.role = window.db.currentUser.role;
           window.db.currentUser = found;
