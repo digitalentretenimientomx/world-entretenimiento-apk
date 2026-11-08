@@ -1075,7 +1075,6 @@
           if(s.vendorId === user.id) return true;
           const assignedClient = window.db.users.find(u => u.id === s.userId);
           if(assignedClient && assignedClient.createdBy === user.id) return true;
-          if(!s.vendorId) return true;
           return false;
         });
       }
@@ -1358,7 +1357,6 @@
           if(s.vendorId === user.id) return true;
           const assignedClient = window.db.users.find(u => u.id === s.userId);
           if(assignedClient && assignedClient.createdBy === user.id) return true;
-          if(!s.vendorId) return true;
           return false;
         });
       }
@@ -1525,6 +1523,12 @@
       const saleSelect = document.getElementById('supportSale');
       if(!saleSelect) return;
       const userSales = window.db.sales.filter(s => s.userId === userId);
+      
+      if(userSales.length === 0) {
+        saleSelect.innerHTML = `<option value="">-- El usuario no tiene cuentas asignadas --</option>`;
+        return;
+      }
+
       saleSelect.innerHTML = userSales.map(s => {
         const p = window.db.platforms.find(x => x.id === s.platformId);
         return `<option value="${s.id}">${p?.name || 'Plataforma'} - ${s.accountEmail} (Vence: ${s.endDate})</option>`;
@@ -1537,27 +1541,48 @@
       const saleId = document.getElementById('supportSale').value;
       const issueType = document.getElementById('supportIssueType').value;
       const detail = document.getElementById('supportDetail').value.trim();
-      const u = window.db.users.find(x => x.id === userId);
+      
+      if(!saleId) return alert('Selecciona una cuenta válida para el reporte.');
+
+      const currentUser = window.db.currentUser;
       const s = window.db.sales.find(x => x.id === saleId);
-      const p = window.db.platforms.find(x => x.id === s?.platformId);
+      const assignedVendorId = s ? (s.vendorId || currentUser.id) : currentUser.id;
 
       const ticket = {
-        id: Date.now().toString(), userId, vendorId: s ? s.vendorId : '1', saleId, issueType, detail,
-        status: 'Pendiente', resolution: '', date: new Date().toISOString().split('T')[0]
+        id: Date.now().toString(),
+        userId,
+        vendorId: assignedVendorId,
+        saleId,
+        issueType,
+        detail,
+        status: 'Pendiente',
+        resolution: '',
+        date: new Date().toISOString().split('T')[0]
       };
       window.db.tickets.push(ticket);
       await saveDB();
       document.getElementById('supportForm').reset();
       renderSupportTable();
       renderStats();
-      alert('¡Reporte creado!');
+      alert('¡Reporte de soporte creado y enviado al Super Admin con éxito!');
     }
 
-    function renderSupportTable() {
+    window.renderSupportTable = function() {
       const tbody = document.getElementById('supportTableBody');
       if(!tbody) return;
       const user = window.db.currentUser;
-      let list = user?.role === 'cliente' ? window.db.tickets.filter(t => t.userId === user.id) : ((user?.role === 'vendedor' || user?.role === 'vendedor_pro') ? window.db.tickets.filter(t => t.vendorId === user.id || !t.vendorId) : window.db.tickets);
+      
+      // Permitir que administradores vean todos y los vendedores vean los de su red
+      let list = user?.role === 'cliente' 
+        ? window.db.tickets.filter(t => t.userId === user.id) 
+        : ((user?.role === 'vendedor' || user?.role === 'vendedor_pro') 
+            ? window.db.tickets.filter(t => t.vendorId === user.id || t.userId === user.id) 
+            : window.db.tickets);
+
+      if(list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="px-3 py-6 text-center text-xs text-slate-400">No hay reportes de soporte activos.</td></tr>`;
+        return;
+      }
 
       tbody.innerHTML = list.map(t => {
         const u = window.db.users.find(x => x.id === t.userId);
@@ -1751,23 +1776,45 @@
       if(!file) return;
       const targetUserId = document.getElementById('csvTargetUserSelect').value;
       if(!targetUserId) return alert('Selecciona un usuario.');
+      
       const reader = new FileReader();
       reader.onload = async function(e) {
         const lines = e.target.result.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        let importedCount = 0;
+
         for(let i = 1; i < lines.length; i++) {
           const cols = lines[i].split(',').map(c => c.replace(/^"(.*)"$/, '$1').trim());
           if(cols.length >= 4) {
             const email = cols[3].toLowerCase();
             if(!window.isDomainAuthorized(email)) continue;
+            
             let p = window.db.platforms.find(x => x.name.toUpperCase() === cols[2].toUpperCase());
-            if(!p) { p = { id: Date.now().toString() + i, name: cols[2].toUpperCase(), category: 'Video', logo: window.db.globalLogo || DEFAULT_LOGO, active: true }; window.db.platforms.push(p); }
-            window.db.sales.push({ id: Date.now().toString() + '_' + i, userId: targetUserId, vendorId: window.db.currentUser?.id || '1', phone: cols[1] || '', platformId: p.id, type: 'perfil', accountEmail: email, accountPass: cols[4] || '123456', profileNum: cols[5] || '1', pin: cols[6] || '', startDate: new Date().toISOString().split('T')[0], endDate: cols[7] || '2026-12-31' });
+            if(!p) { 
+              p = { id: Date.now().toString() + i, name: cols[2].toUpperCase(), category: 'Video', logo: window.db.globalLogo || DEFAULT_LOGO, active: true }; 
+              window.db.platforms.push(p); 
+            }
+            
+            window.db.sales.push({ 
+              id: Date.now().toString() + '_' + i, 
+              userId: targetUserId, 
+              vendorId: window.db.currentUser?.id || '1', 
+              phone: cols[1] || '', 
+              platformId: p.id, 
+              type: 'perfil', 
+              accountEmail: email, 
+              accountPass: cols[4] || '123456', 
+              profileNum: cols[5] || '1', 
+              pin: cols[6] || '', 
+              startDate: new Date().toISOString().split('T')[0], 
+              endDate: cols[7] || '2026-12-31' 
+            });
+            importedCount++;
           }
         }
         await saveDB();
         renderAll();
         event.target.value = '';
-        alert('¡Carga masiva completada!');
+        alert(`¡Carga masiva completada! Se importaron ${importedCount} cuentas con éxito.`);
       };
       reader.readAsText(file);
     }
@@ -1823,7 +1870,7 @@
           }
         }
       }
-      if(viewId === 'supportView') { renderSupportTable(); populateDropdowns(); }
+      if(viewId === 'supportView') { populateDropdowns(); renderSupportTable(); }
       if(viewId === 'assignedAccountsView') renderAssignedAccountsTable();
       if(viewId === 'salesView') { renderSalesTable(); populateDropdowns(); updateDefaultEndDate(); }
       if(viewId === 'remindersView') renderReminders();
@@ -1850,8 +1897,8 @@
 
     function renderStats() {
       const isVendor = window.db.currentUser?.role === 'vendedor' || window.db.currentUser?.role === 'vendedor_pro';
-      const mySales = isVendor ? window.db.sales.filter(s => s.vendorId === window.db.currentUser.id || !s.vendorId) : window.db.sales;
-      const myTickets = isVendor ? window.db.tickets.filter(t => t.vendorId === window.db.currentUser.id || !t.vendorId) : window.db.tickets;
+      const mySales = isVendor ? window.db.sales.filter(s => s.vendorId === window.db.currentUser.id) : window.db.sales;
+      const myTickets = isVendor ? window.db.tickets.filter(t => t.vendorId === window.db.currentUser.id) : window.db.tickets;
       const myUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === window.db.currentUser.id) : window.db.users.filter(u => u.role === 'cliente');
       document.getElementById('statTotalUsers').innerText = myUsers.length;
       document.getElementById('statTotalPlatforms').innerText = window.db.platforms.filter(p => p.active).length;
@@ -1867,6 +1914,7 @@
       const csvTargetSelect = document.getElementById('csvTargetUserSelect');
       const currentUser = window.db.currentUser;
       const isVendor = currentUser?.role === 'vendedor' || currentUser?.role === 'vendedor_pro';
+      
       let availableUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === currentUser.id) : window.db.users;
 
       if(uSelect && pSelect) {
@@ -1876,7 +1924,7 @@
         onPlatformChange();
       }
       if(csvTargetSelect) {
-        let csvUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && (u.createdBy === currentUser.id || !u.createdBy)) : window.db.users;
+        let csvUsers = isVendor ? window.db.users.filter(u => u.role === 'cliente' && u.createdBy === currentUser.id) : window.db.users;
         csvTargetSelect.innerHTML = csvUsers.map(u => `<option value="${u.id}">${u.name} (${u.email})</option>`).join('');
       }
       if(supportUserSelect) {
@@ -1976,7 +2024,6 @@
       }
       await saveDB();
 
-      // Disparar envío por WhatsApp automático al cliente con la fecha personalizada
       const u = window.db.users.find(x => x.id === userId);
       const p = window.db.platforms.find(x => x.id === platformId);
       const clientPhone = phone || (u ? u.phone : '');
@@ -2018,7 +2065,13 @@
       if(!tbody) return;
       const user = window.db.currentUser;
       const isVendor = user?.role === 'vendedor' || user?.role === 'vendedor_pro';
-      let list = isVendor ? window.db.sales.filter(s => s.vendorId === user.id || !s.vendorId) : window.db.sales;
+      
+      let list = isVendor ? window.db.sales.filter(s => {
+        if(s.vendorId === user.id) return true;
+        const assignedClient = window.db.users.find(u => u.id === s.userId);
+        if(assignedClient && assignedClient.createdBy === user.id) return true;
+        return false;
+      }) : window.db.sales;
 
       if(list.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4" class="px-3 py-6 text-center text-xs text-slate-400">No hay suscripciones vendidas registradas.</td></tr>`;
